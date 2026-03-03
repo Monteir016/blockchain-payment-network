@@ -1,12 +1,10 @@
 # BlockchainIST
 
 Distributed Systems Project 2026
+  
+**Group A46**
 
-*(fill the line below with the group identifier, for example A25 or T25, and then delete this line)*  
-**Group GXX**
-
-*(choose one of the following levels and erase the other one)*  
-**Difficulty level: I am Death incarnate! | Bring 'em on!**
+**Difficulty level: I am Death incarnate!**
 
 
 ### Code Identification
@@ -21,9 +19,8 @@ code dependency management, to ensure your code runs using the correct component
 
 | Number | Name              | User                             | Email                               |
 |--------|-------------------|----------------------------------|-------------------------------------|
-| 11111  | Alice Distributed | <https://github.com/AliceUser>   | <mailto:alice@tecnico.ulisboa.pt>   |
-| 22222  | Bob Systems       | <https://github.com/BobUser>     | <mailto:bob@tecnico.ulisboa.pt>     |
-| 33333  | Charlie Rules     | <https://github.com/CharlieUser> | <mailto:charlie@tecnico.ulisboa.pt> |
+| 110135  | Manuel Semedo | <https://github.com/semedooo>   | <mailto:manuel.semedo@tecnico.ulisboa.pt>   |
+| 110458  | Guilherme Monteiro       | <https://github.com/Monteir016>     | <mailto:bob@tecnico.ulisboa.pt>     |
 
 ## Getting Started
 

@@ -47,6 +47,11 @@ public class ClientMain {
 
         CommandProcessor processor = new CommandProcessor(nodes);
         processor.userInputLoop();
+
+        // Fechar todos os channels gRPC
+        for (ClientNodeService node : nodes) {
+            node.shutdown();
+        }
     }
 
     private static void printUsage() {
