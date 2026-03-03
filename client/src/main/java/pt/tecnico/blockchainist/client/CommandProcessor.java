@@ -1,11 +1,16 @@
 package pt.tecnico.blockchainist.client;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 import pt.tecnico.blockchainist.client.grpc.ClientNodeService;
+import pt.tecnico.blockchainist.contract.Transaction;
+
+
+import io.grpc.StatusRuntimeException;
 
 public class CommandProcessor {
 
@@ -108,8 +113,14 @@ public class CommandProcessor {
         Integer nodeIndex = Integer.parseInt(split[3]);
         Integer nodeDelay = Integer.parseInt(split[4]);
 
-        // TODO
-        System.out.println("TODO: createWallet(" + userId + ", " + walletId + ")");
+        ClientNodeService node = this.nodes.get(nodeIndex);
+        try {
+            node.createWallet(userId, walletId);
+            System.out.println("OK " + commandNumber);
+        } catch (StatusRuntimeException e) {
+            System.err.println(e.getStatus().getDescription());
+        }
+    
     }
 
     private void delete(String[] split, boolean isBlocking) {
@@ -122,8 +133,14 @@ public class CommandProcessor {
         Integer nodeIndex = Integer.parseInt(split[3]);
         Integer nodeDelay = Integer.parseInt(split[4]);
 
-        // TODO
-        System.out.println("TODO: deleteWallet(" + userId + ", " + walletId + ")");
+        ClientNodeService node = this.nodes.get(nodeIndex);
+        try {
+            node.deleteWallet(userId, walletId);
+            System.out.println("OK " + commandNumber);
+        } catch (StatusRuntimeException e) {
+            System.err.println(e.getStatus().getDescription());;
+        }
+
     }
 
     private void balance(String[] split, boolean isBlocking) {
@@ -135,8 +152,15 @@ public class CommandProcessor {
         Integer nodeIndex = Integer.parseInt(split[2]);
         Integer nodeDelay = Integer.parseInt(split[3]);
 
-        // TODO
-        System.out.println("TODO: readBalance(" + walletId + ")");
+        ClientNodeService node = this.nodes.get(nodeIndex);
+        try {
+            long balance = node.readBalance(walletId);
+            System.out.println("OK " + commandNumber);
+            System.out.println(balance);
+        } catch (StatusRuntimeException e) {
+            System.err.println(e.getStatus().getDescription());
+        }
+
     }
 
     private void transfer(String[] split, boolean isBlocking) {
@@ -151,8 +175,14 @@ public class CommandProcessor {
         Integer nodeIndex = Integer.parseInt(split[5]);
         Integer nodeDelay = Integer.parseInt(split[6]);
 
-        // TODO
-        System.out.println("TODO: transfer(" + sourceUserId + ", " + sourceWalletId + ", " + destinationWalletId + ", " + amount + ")");
+        ClientNodeService node = this.nodes.get(nodeIndex);
+
+        try {
+            node.transfer(sourceUserId, sourceWalletId, destinationWalletId, amount);
+            System.out.println("OK " + commandNumber);
+        } catch (StatusRuntimeException e) {
+            System.err.println(e.getStatus().getDescription());
+        }
     }
 
     private void debugBlockchainState(String[] split) {
@@ -162,8 +192,18 @@ public class CommandProcessor {
 
         Integer nodeIndex = Integer.parseInt(split[1]);
 
-        // TODO
-        System.out.println("TODO: getBlockchainState(" + nodeIndex + ")");
+        ClientNodeService node = this.nodes.get(nodeIndex);
+
+        try {
+            List<Transaction> blockchainState = node.getBlockchainState();
+            System.out.println("OK " + commandNumber);
+            for (Transaction tx : blockchainState) {
+                System.out.println(tx);
+            }
+        } catch (StatusRuntimeException e) {
+            System.err.println(e.getStatus().getDescription());
+        }
+
     }
 
     private void pause(String[] split) {
