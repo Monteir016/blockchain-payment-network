@@ -24,7 +24,7 @@
 		<module>contract</module>
 		<module>client</module>
 		<module>node</module>
-		<!-- TODO -->
+		<module>sequencer</module>
 	</modules>
 
 </project>

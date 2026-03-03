@@ -15,12 +15,11 @@ code dependency management, to ensure your code runs using the correct component
 
 ### Team Members
 
-*(fill the table below with the team members, and then delete this line)*
 
 | Number | Name              | User                             | Email                               |
 |--------|-------------------|----------------------------------|-------------------------------------|
 | 110135  | Manuel Semedo | <https://github.com/semedooo>   | <mailto:manuel.semedo@tecnico.ulisboa.pt>   |
-| 110458  | Guilherme Monteiro       | <https://github.com/Monteir016>     | <mailto:bob@tecnico.ulisboa.pt>     |
+| 110458  | Guilherme Monteiro       | <https://github.com/Monteir016>     | <mailto:guilherme.dias.monteiro@tecnico.ulisboa.pt>     |
 
 ## Getting Started
 
