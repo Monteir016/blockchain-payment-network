@@ -11,19 +11,26 @@ import pt.tecnico.blockchainist.contract.*;
 public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     
     private final NodeState nodeState;
+    private final NodeSequencerService sequencerService;
 
-    public NodeServiceImpl(NodeState nodeState) {
+    public NodeServiceImpl(NodeState nodeState, NodeSequencerService sequencerService) {
         this.nodeState = nodeState;
+        this.sequencerService = sequencerService;
     }
 
     @Override
     public void createWallet(CreateWalletRequest request, StreamObserver<CreateWalletResponse> responseObserver) {
         
         try {
-            nodeState.createWallet(request.getUserId(), request.getWalletId());
-            CreateWalletResponse response = CreateWalletResponse.newBuilder().build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
+            Transaction tx = Transaction.newBuilder()
+                            .setCreateWallet(request)
+                            .build();
+            int sequenceNumber = sequencerService.broadcast(tx);
+            Transaction deliveredTx = sequencerService.deliverTransaction(sequenceNumber);
+            nodeState.executeTransaction(deliveredTx);
+
+            responseObserver.onNext(CreateWalletResponse.newBuilder().build());
+            responseObserver.onCompleted();            
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
         }
@@ -32,9 +39,15 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     @Override
     public void deleteWallet(DeleteWalletRequest request, StreamObserver<DeleteWalletResponse> responseObserver) {
         try {
-            nodeState.deleteWallet(request.getUserId(), request.getWalletId());
-            DeleteWalletResponse response = DeleteWalletResponse.newBuilder().build();
-            responseObserver.onNext(response);
+            Transaction tx = Transaction.newBuilder()
+                    .setDeleteWallet(request)
+                    .build();
+
+            int seqNum = sequencerService.broadcast(tx);
+            Transaction deliveredTx = sequencerService.deliverTransaction(seqNum);
+            nodeState.executeTransaction(deliveredTx);
+
+            responseObserver.onNext(DeleteWalletResponse.newBuilder().build());
             responseObserver.onCompleted();
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
@@ -44,9 +57,15 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     @Override
     public void transfer(TransferRequest request, StreamObserver<TransferResponse> responseObserver) {
         try {
-            nodeState.transfer(request.getSrcUserId(), request.getSrcWalletId(), request.getDstWalletId(), request.getValue());
-            TransferResponse response = TransferResponse.newBuilder().build();
-            responseObserver.onNext(response);
+            Transaction tx = Transaction.newBuilder()
+                    .setTransfer(request)
+                    .build();
+
+            int seqNum = sequencerService.broadcast(tx);
+            Transaction deliveredTx = sequencerService.deliverTransaction(seqNum);
+            nodeState.executeTransaction(deliveredTx);
+
+            responseObserver.onNext(TransferResponse.newBuilder().build());
             responseObserver.onCompleted();
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());

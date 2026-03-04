@@ -6,6 +6,7 @@ import io.grpc.ServerBuilder;
 
 import pt.tecnico.blockchainist.node.domain.NodeState;
 import pt.tecnico.blockchainist.node.grpc.NodeServiceImpl;
+import pt.tecnico.blockchainist.node.grpc.NodeSequencerService;
 
 public class NodeMain {
     public static void main(String[] args) {
@@ -28,17 +29,32 @@ public class NodeMain {
         final String nodeId = args[1];
         final String sequencerId = args[2];
 
-        final BindableService impl = new NodeServiceImpl(new NodeState());
-        
-        // Start gRPC server
-        final Server server = ServerBuilder.forPort(port).addService(impl).build();
+        // Parse sequencer host and port
+        String[] sequencerParts = sequencerId.split(":");  
+        if (sequencerParts.length != 2) {
+            System.err.println("Invalid sequencerId format. Expected host:port");
+            return;
+        }
+        String sequencerHost = sequencerParts[0];
+        int sequencerPort = Integer.parseInt(sequencerParts[1]);
 
+        // Create sequencer service client
+        NodeSequencerService sequencerService = new NodeSequencerService(sequencerHost, sequencerPort);
+
+        //Create state and node service
+        NodeState nodeState = new NodeState();
+        final BindableService impl = new NodeServiceImpl(nodeState, sequencerService);
+        
         try {
+            final Server server = ServerBuilder.forPort(port)
+                    .addService(impl)
+                    .build();
             server.start();
             System.out.println("Server started, listening on " + port);
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 System.out.println("Shutting down server...");
                 server.shutdown();
+                sequencerService.shutdown();
             }));
             server.awaitTermination();
         } catch (Exception e) {

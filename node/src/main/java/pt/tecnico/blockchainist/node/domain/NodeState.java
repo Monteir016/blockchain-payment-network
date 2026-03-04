@@ -110,6 +110,26 @@ public class NodeState {
 
     }
 
+    // Executa uma transação já ordenada pelo sequenciador.
+    public synchronized void executeTransaction(Transaction transaction) {
+        switch (transaction.getOperationCase()) {
+            case CREATE_WALLET:
+                CreateWalletRequest cw = transaction.getCreateWallet();
+                createWallet(cw.getUserId(), cw.getWalletId());
+                break;
+            case DELETE_WALLET:
+                DeleteWalletRequest dw = transaction.getDeleteWallet();
+                deleteWallet(dw.getUserId(), dw.getWalletId());
+                break;
+            case TRANSFER:
+                TransferRequest tr = transaction.getTransfer();
+                transfer(tr.getSrcUserId(), tr.getSrcWalletId(), tr.getDstWalletId(), tr.getValue());
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown transaction type");
+        }
+    }
+
     public synchronized long readBalance(String walletId) {
         
         if (!walletOwners.containsKey(walletId)) {
