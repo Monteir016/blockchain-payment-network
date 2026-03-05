@@ -8,6 +8,11 @@ import pt.tecnico.blockchainist.node.domain.NodeState;
 import pt.tecnico.blockchainist.contract.*;
 
 
+/**
+ * gRPC service implementation for the NodeService.
+ * Acts as adapter between protobuf messages and the domain (NodeState).
+ * Write operations are forwarded to the sequencer before local execution.
+ */
 public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     
     private final NodeState nodeState;

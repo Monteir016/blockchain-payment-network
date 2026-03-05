@@ -7,6 +7,7 @@ import pt.tecnico.blockchainist.contract.*;
 import pt.tecnico.blockchainist.sequencer.domain.SequencerState;
 
 
+/** gRPC service implementation for the simplified sequencer (A.2). */
 public class SequencerServiceImpl extends SequencerServiceGrpc.SequencerServiceImplBase {
 
     private final SequencerState state;

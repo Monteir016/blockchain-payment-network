@@ -48,7 +48,7 @@ public class ClientMain {
         CommandProcessor processor = new CommandProcessor(nodes);
         processor.userInputLoop();
 
-        // Fechar todos os channels gRPC
+        // Shutdown all gRPC channels before exiting
         for (ClientNodeService node : nodes) {
             node.shutdown();
         }

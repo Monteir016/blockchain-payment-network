@@ -5,9 +5,13 @@ import pt.tecnico.blockchainist.contract.Transaction;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Domain class maintaining the totally ordered list of transactions.
+ * The list index serves as the sequence number.
+ */
 public class SequencerState {
 
-    // Lista de transações ordenadas (o índice é o sequence_number)
+    // Ordered transaction list (index = sequence number)
     private final List<Transaction> transactions = new ArrayList<>();
 
     public synchronized int addTransaction(Transaction transaction) {
