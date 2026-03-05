@@ -12,6 +12,7 @@ import pt.tecnico.blockchainist.contract.Transaction;
 
 import io.grpc.StatusRuntimeException;
 
+/** Reads user commands from stdin, dispatches gRPC calls, and prints results. */
 public class CommandProcessor {
 
     private static final String SPACE = " ";

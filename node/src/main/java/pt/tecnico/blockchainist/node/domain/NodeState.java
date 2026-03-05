@@ -10,20 +10,26 @@ import java.util.HashMap;
 import java.util.List;
 
 
+/**
+ * Domain class representing the global state of the cryptocurrency.
+ * All public methods are synchronized to ensure thread-safe access
+ * from the gRPC server thread pool.
+ */
 public class NodeState {
 
-    HashMap<String, String> walletOwners = new HashMap<>();
-    HashMap<String, Long> walletBalances = new HashMap<>();
+    // Wallet ownership: walletId -> userId
+    private final HashMap<String, String> walletOwners = new HashMap<>();
+    // Wallet balances: walletId -> balance
+    private final HashMap<String, Long> walletBalances = new HashMap<>();
     
-    // - The transaction ledger (up to A.2, a chain of individual transactions; after B.1, a chain of blocks)
-    List<Transaction> transactionLedger = new ArrayList<>();
+    // Transaction ledger (A.2: individual transactions; B.1+: blocks)
+    private final List<Transaction> transactionLedger = new ArrayList<>();
 
 
     public NodeState() {
-        // Initialize the 'bc' wallet
+        // Pre-existing central bank wallet with initial balance of 1000
         walletOwners.put("bc", "BC");
         walletBalances.put("bc", 1000L);
-
     }
 
     public synchronized void createWallet(String userId, String walletId) {
@@ -110,7 +116,7 @@ public class NodeState {
 
     }
 
-    // Executa uma transação já ordenada pelo sequenciador.
+    // Execute a transaction already ordered by the sequencer.
     public synchronized void executeTransaction(Transaction transaction) {
         switch (transaction.getOperationCase()) {
             case CREATE_WALLET:
@@ -140,7 +146,7 @@ public class NodeState {
     }
 
     public synchronized List<Transaction> getBlockchainState() {
-        return new ArrayList<>(transactionLedger);  // cópia defensiva
+        return new ArrayList<>(transactionLedger);  // defensive copy
     }
 
 }
