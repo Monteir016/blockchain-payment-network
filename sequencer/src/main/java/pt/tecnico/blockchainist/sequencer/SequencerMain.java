@@ -12,26 +12,26 @@ public class SequencerMain {
 
         System.out.println(SequencerMain.class.getSimpleName());
 
-        // Verificar argumentos
+        // Validate arguments
         if (args.length < 1) {
-            System.err.println("No argument");
+            System.err.println("Argument(s) missing!");
             System.err.printf("Usage: java %s <port>%n", SequencerMain.class.getName());
             return;
         }
 
         final int port = Integer.parseInt(args[0]);
 
-        // Criar estado e serviço
+        // Create domain state and gRPC service implementation
         final SequencerState state = new SequencerState();
         final BindableService impl = new SequencerServiceImpl(state);
 
-        // Arrancar servidor gRPC
+        // Start gRPC server
         try {
             final Server server = ServerBuilder.forPort(port).addService(impl).build();
             server.start();
             System.out.println("Sequencer started, listening on port " + port);
 
-            // Shutdown hook para fecho limpo
+            // Register shutdown hook for graceful termination
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 System.out.println("Shutting down sequencer...");
                 server.shutdown();

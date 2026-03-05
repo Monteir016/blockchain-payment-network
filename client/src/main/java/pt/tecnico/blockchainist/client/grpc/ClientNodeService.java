@@ -8,6 +8,11 @@ import io.grpc.ManagedChannelBuilder;
 import java.util.List;
 
 
+/**
+ * gRPC client for communicating with a blockchain node.
+ * Encapsulates the managed channel and blocking stub.
+ * Exceptions are propagated to the caller (CommandProcessor).
+ */
 public class ClientNodeService {
 
     private final ManagedChannel channel;

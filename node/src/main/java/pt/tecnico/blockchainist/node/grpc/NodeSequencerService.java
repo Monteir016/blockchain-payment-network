@@ -5,6 +5,7 @@ import io.grpc.ManagedChannelBuilder;
 
 import pt.tecnico.blockchainist.contract.*;
 
+/** gRPC client for communicating with the sequencer service. */
 public class NodeSequencerService {
 
     private final ManagedChannel channel;
@@ -17,9 +18,9 @@ public class NodeSequencerService {
         this.stub = SequencerServiceGrpc.newBlockingStub(this.channel);
     }
 
-     /**
-     * Envia uma transação ao sequenciador para ser ordenada.
-     * @return O número de sequência atribuído pelo sequenciador
+    /**
+     * Sends a transaction to the sequencer for total ordering.
+     * @return the sequence number assigned by the sequencer
      */
     public int broadcast(Transaction transaction) {
         BroadcastRequest request = BroadcastRequest.newBuilder()
@@ -30,8 +31,8 @@ public class NodeSequencerService {
     }
 
     /**
-     * Pede ao sequenciador a transação com o número de sequência dado.
-     * @return A transação entregue pelo sequenciador
+     * Requests the transaction with the given sequence number from the sequencer.
+     * @return the delivered transaction
      */
     public Transaction deliverTransaction(int sequenceNumber) {
         DeliverTransactionRequest request = DeliverTransactionRequest.newBuilder()

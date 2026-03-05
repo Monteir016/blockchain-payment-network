@@ -11,26 +11,26 @@ import pt.tecnico.blockchainist.node.grpc.NodeSequencerService;
 public class NodeMain {
     public static void main(String[] args) {
 
-        // Receive arguments
+        // Log received arguments
         System.out.printf("Received %d arguments%n", args.length);
 		for (int i = 0; i < args.length; i++) {
 			System.out.printf("arg[%d] = %s%n", i, args[i]);
 		}
 
-		// Check arguments
+		// Validate argument count
 		if (args.length < 3) {
 			System.err.println("Argument(s) missing!");
-            System.err.printf("Usage: java %s <port> <nodeId> <sequencerId>%n", NodeMain.class.getName());
+            System.err.printf("Usage: java %s <port> <organization> <sequencerHost:sequencerPort>%n", NodeMain.class.getName());
 			return;
 		}
 
-        // Parse arguments
+        // Parse arguments: port, organization name, sequencer address
         final int port = Integer.parseInt(args[0]);
-        final String nodeId = args[1];
-        final String sequencerId = args[2];
+        final String organization = args[1];
+        final String sequencerAddress = args[2];
 
-        // Parse sequencer host and port
-        String[] sequencerParts = sequencerId.split(":");  
+        // Parse sequencer host and port from address string
+        String[] sequencerParts = sequencerAddress.split(":");  
         if (sequencerParts.length != 2) {
             System.err.println("Invalid sequencerId format. Expected host:port");
             return;
@@ -38,10 +38,10 @@ public class NodeMain {
         String sequencerHost = sequencerParts[0];
         int sequencerPort = Integer.parseInt(sequencerParts[1]);
 
-        // Create sequencer service client
+        // Create gRPC client for the sequencer
         NodeSequencerService sequencerService = new NodeSequencerService(sequencerHost, sequencerPort);
 
-        //Create state and node service
+        // Create domain state and gRPC service implementation
         NodeState nodeState = new NodeState();
         final BindableService impl = new NodeServiceImpl(nodeState, sequencerService);
         
