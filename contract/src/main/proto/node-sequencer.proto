@@ -25,8 +25,17 @@ message DeliverTransactionResponse {
   Transaction transaction = 1;
 }
 
+message DeliverBlockRequest {
+  int32 block_id = 1;
+}
+
+message DeliverBlockResponse {
+  bool available = 1;
+  Block block = 2;
+}
+
 service SequencerService {
   rpc Broadcast(BroadcastRequest) returns (BroadcastResponse);
   rpc DeliverTransaction(DeliverTransactionRequest) returns (DeliverTransactionResponse);
-  // TO DO: na entrega B.1, adicionar operação DeliverBlock, que devolve bloco.
+  rpc DeliverBlock(DeliverBlockRequest) returns (DeliverBlockResponse);
 }
