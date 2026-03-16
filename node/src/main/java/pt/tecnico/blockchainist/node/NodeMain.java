@@ -4,6 +4,7 @@ import io.grpc.BindableService;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
+import pt.tecnico.blockchainist.node.domain.ApplicationPipeline;
 import pt.tecnico.blockchainist.node.domain.NodeState;
 import pt.tecnico.blockchainist.node.grpc.NodeServiceImpl;
 import pt.tecnico.blockchainist.node.grpc.NodeSequencerService;
@@ -41,10 +42,13 @@ public class NodeMain {
         // Create gRPC client for the sequencer
         NodeSequencerService sequencerService = new NodeSequencerService(sequencerHost, sequencerPort);
 
-        // Create domain state and gRPC service implementation
+        // Create domain state and application pipeline
         NodeState nodeState = new NodeState();
-        final BindableService impl = new NodeServiceImpl(nodeState, sequencerService);
-        
+        ApplicationPipeline applicationPipeline = new ApplicationPipeline(nodeState, sequencerService);
+        applicationPipeline.start();
+
+        final BindableService impl = new NodeServiceImpl(nodeState, sequencerService, applicationPipeline);
+
         try {
             final Server server = ServerBuilder.forPort(port)
                     .addService(impl)
@@ -53,6 +57,7 @@ public class NodeMain {
             System.out.println("Server started, listening on " + port);
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 System.out.println("Shutting down server...");
+                applicationPipeline.stop();
                 server.shutdown();
                 sequencerService.shutdown();
             }));
