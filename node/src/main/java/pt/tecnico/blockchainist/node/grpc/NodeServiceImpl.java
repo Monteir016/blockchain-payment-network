@@ -1,43 +1,64 @@
 package pt.tecnico.blockchainist.node.grpc;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import pt.tecnico.blockchainist.node.domain.ApplicationPipeline;
 import pt.tecnico.blockchainist.node.domain.NodeState;
 import pt.tecnico.blockchainist.contract.*;
 
 
 /**
- * gRPC service implementation for the NodeService.
- * Acts as adapter between protobuf messages and the domain (NodeState).
- * Write operations are forwarded to the sequencer before local execution.
+ * gRPC service implementation for the NodeService
+ * Write operations broadcast to the sequencer and wait for the application
+ * pipeline to apply the transaction in total order before responding.
  */
 public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
-    
+
+    private static final long PENDING_TIMEOUT_SEC = 60;
+
     private final NodeState nodeState;
     private final NodeSequencerService sequencerService;
+    private final ApplicationPipeline applicationPipeline;
 
-    public NodeServiceImpl(NodeState nodeState, NodeSequencerService sequencerService) {
+    public NodeServiceImpl(NodeState nodeState, NodeSequencerService sequencerService,
+                           ApplicationPipeline applicationPipeline) {
         this.nodeState = nodeState;
         this.sequencerService = sequencerService;
+        this.applicationPipeline = applicationPipeline;
     }
 
     @Override
     public void createWallet(CreateWalletRequest request, StreamObserver<CreateWalletResponse> responseObserver) {
-        
         try {
             Transaction tx = Transaction.newBuilder()
-                            .setCreateWallet(request)
-                            .build();
-            int sequenceNumber = sequencerService.broadcast(tx);
-            Transaction deliveredTx = sequencerService.deliverTransaction(sequenceNumber);
-            nodeState.executeTransaction(deliveredTx);
+                    .setCreateWallet(request)
+                    .build();
+            sequencerService.broadcast(tx);
+            CompletableFuture<Void> done = new CompletableFuture<>();
+            applicationPipeline.registerPending(tx, done);
+            done.get(PENDING_TIMEOUT_SEC, TimeUnit.SECONDS);
 
             responseObserver.onNext(CreateWalletResponse.newBuilder().build());
-            responseObserver.onCompleted();            
+            responseObserver.onCompleted();
+        } catch (TimeoutException e) {
+            responseObserver.onError(Status.DEADLINE_EXCEEDED.withDescription("Transaction not applied in time").asRuntimeException());
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IllegalArgumentException) {
+                responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(cause.getMessage()).asRuntimeException());
+            } else {
+                responseObserver.onError(Status.INTERNAL.withDescription(cause != null ? cause.getMessage() : e.getMessage()).asRuntimeException());
+            }
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+        } catch (Throwable e) {
+            responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
         }
     }
 
@@ -48,14 +69,26 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
                     .setDeleteWallet(request)
                     .build();
 
-            int seqNum = sequencerService.broadcast(tx);
-            Transaction deliveredTx = sequencerService.deliverTransaction(seqNum);
-            nodeState.executeTransaction(deliveredTx);
+            sequencerService.broadcast(tx);
+            CompletableFuture<Void> done = new CompletableFuture<>();
+            applicationPipeline.registerPending(tx, done);
+            done.get(PENDING_TIMEOUT_SEC, TimeUnit.SECONDS);
 
             responseObserver.onNext(DeleteWalletResponse.newBuilder().build());
             responseObserver.onCompleted();
+        } catch (TimeoutException e) {
+            responseObserver.onError(Status.DEADLINE_EXCEEDED.withDescription("Transaction not applied in time").asRuntimeException());
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IllegalArgumentException) {
+                responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(cause.getMessage()).asRuntimeException());
+            } else {
+                responseObserver.onError(Status.INTERNAL.withDescription(cause != null ? cause.getMessage() : e.getMessage()).asRuntimeException());
+            }
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+        } catch (Throwable e) {
+            responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
         }
     }
 
@@ -66,14 +99,26 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
                     .setTransfer(request)
                     .build();
 
-            int seqNum = sequencerService.broadcast(tx);
-            Transaction deliveredTx = sequencerService.deliverTransaction(seqNum);
-            nodeState.executeTransaction(deliveredTx);
+            sequencerService.broadcast(tx);
+            CompletableFuture<Void> done = new CompletableFuture<>();
+            applicationPipeline.registerPending(tx, done);
+            done.get(PENDING_TIMEOUT_SEC, TimeUnit.SECONDS);
 
             responseObserver.onNext(TransferResponse.newBuilder().build());
             responseObserver.onCompleted();
+        } catch (TimeoutException e) {
+            responseObserver.onError(Status.DEADLINE_EXCEEDED.withDescription("Transaction not applied in time").asRuntimeException());
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IllegalArgumentException) {
+                responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(cause.getMessage()).asRuntimeException());
+            } else {
+                responseObserver.onError(Status.INTERNAL.withDescription(cause != null ? cause.getMessage() : e.getMessage()).asRuntimeException());
+            }
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+        } catch (Throwable e) {
+            responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
         }
     }
 
