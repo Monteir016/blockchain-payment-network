@@ -2,6 +2,7 @@ package pt.tecnico.blockchainist.node.grpc;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
 
 import pt.tecnico.blockchainist.contract.*;
 
@@ -40,6 +41,24 @@ public class NodeSequencerService {
                 .build();
         DeliverTransactionResponse response = stub.deliverTransaction(request);
         return response.getTransaction();
+    }
+
+    /**
+     * Requests block by index from the sequencer
+     * @param blockId block index (0-based)
+     * @return the response with block if available, or empty if block not yet closed
+     */
+    public java.util.Optional<DeliverBlockResponse> tryDeliverBlock(int blockId) {
+        DeliverBlockRequest request = DeliverBlockRequest.newBuilder()
+                .setBlockId(blockId)
+                .build();
+        try {
+            DeliverBlockResponse response = stub.deliverBlock(request);
+            return java.util.Optional.of(response);
+        } catch (StatusRuntimeException e) {
+            // Block not yet available
+            return java.util.Optional.empty();
+        }
     }
 
     public void shutdown() {
