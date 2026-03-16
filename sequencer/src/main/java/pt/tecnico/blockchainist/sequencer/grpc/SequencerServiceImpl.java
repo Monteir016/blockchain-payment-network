@@ -54,4 +54,23 @@ public class SequencerServiceImpl extends SequencerServiceGrpc.SequencerServiceI
             );
         }
     }
+
+    public void deliverBlock(DeliverBlockRequest request,
+                                StreamObserver<DeliverBlockResponse> responseObserver) {
+        try {
+            int blockId = request.getBlockId();
+            Block block = state.getBlock(blockId);
+
+            DeliverBlockResponse response = DeliverBlockResponse.newBuilder()
+                    .setBlock(block)
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (IllegalArgumentException e) {
+            responseObserver.onError(
+                Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException()
+            );
+        }
+    }
 }

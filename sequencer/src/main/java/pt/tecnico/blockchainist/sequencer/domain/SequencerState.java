@@ -91,6 +91,17 @@ public class SequencerState {
         }
     }
 
+    public synchronized Block getBlock(int blockId) {
+        if (blockId < 0 || blockId >= blocks.size()) {
+            throw new IllegalArgumentException(
+                "Invalid block ID: " + blockId +
+                "Current range: [0, " + (blocks.size() - 1) + "]"
+            );
+        }
+        return blocks.get(blockId);
+    }
+
+
     public synchronized Transaction getTransaction(int sequenceNumber) {
         if (sequenceNumber < 0 || sequenceNumber >= transactions.size()) {
             throw new IllegalArgumentException(
