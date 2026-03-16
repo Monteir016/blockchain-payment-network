@@ -39,9 +39,10 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
             Transaction tx = Transaction.newBuilder()
                     .setCreateWallet(request)
                     .build();
-            sequencerService.broadcast(tx);
             CompletableFuture<Void> done = new CompletableFuture<>();
             applicationPipeline.registerPending(tx, done);
+
+            sequencerService.broadcast(tx);
             done.get(PENDING_TIMEOUT_SEC, TimeUnit.SECONDS);
 
             responseObserver.onNext(CreateWalletResponse.newBuilder().build());
@@ -69,9 +70,10 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
                     .setDeleteWallet(request)
                     .build();
 
-            sequencerService.broadcast(tx);
             CompletableFuture<Void> done = new CompletableFuture<>();
             applicationPipeline.registerPending(tx, done);
+
+            sequencerService.broadcast(tx);
             done.get(PENDING_TIMEOUT_SEC, TimeUnit.SECONDS);
 
             responseObserver.onNext(DeleteWalletResponse.newBuilder().build());
@@ -99,9 +101,10 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
                     .setTransfer(request)
                     .build();
 
-            sequencerService.broadcast(tx);
             CompletableFuture<Void> done = new CompletableFuture<>();
             applicationPipeline.registerPending(tx, done);
+
+            sequencerService.broadcast(tx);
             done.get(PENDING_TIMEOUT_SEC, TimeUnit.SECONDS);
 
             responseObserver.onNext(TransferResponse.newBuilder().build());
