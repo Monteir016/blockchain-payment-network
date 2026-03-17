@@ -4,6 +4,8 @@ import pt.tecnico.blockchainist.contract.*;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 
 import java.util.List;
 
@@ -18,6 +20,9 @@ import pt.tecnico.blockchainist.client.grpc.ClientNodeObserver;
  * Exceptions are propagated to the caller (CommandProcessor).
  */
 public class ClientNodeService {
+    private static final String DELAY_HEADER_NAME = "delay-seconds";
+    private static final Metadata.Key<String> DELAY_HEADER_KEY =
+            Metadata.Key.of(DELAY_HEADER_NAME, Metadata.ASCII_STRING_MARSHALLER);
 
     private final ManagedChannel channel;
     private final NodeServiceGrpc.NodeServiceBlockingStub blockingStub;
@@ -47,31 +52,51 @@ public class ClientNodeService {
         this.asyncStub = NodeServiceGrpc.newStub(this.channel);
     }
 
-    public void createWallet(String userId, String walletId, boolean isBlocking, long commandNumber) {
+    private Metadata createDelayMetadata(int delaySeconds) {
+        Metadata headers = new Metadata();
+        headers.put(DELAY_HEADER_KEY, Integer.toString(delaySeconds));
+        return headers;
+    }
+
+    private NodeServiceGrpc.NodeServiceBlockingStub blockingStubWithDelay(int delaySeconds) {
+        Metadata headers = createDelayMetadata(delaySeconds);
+        return blockingStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers));
+    }
+
+    private NodeServiceGrpc.NodeServiceStub asyncStubWithDelay(int delaySeconds) {
+        Metadata headers = createDelayMetadata(delaySeconds);
+        return asyncStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers));
+    }
+
+    public void createWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber) {
         CreateWalletRequest request = CreateWalletRequest.newBuilder()
                                         .setUserId(userId)
                                         .setWalletId(walletId)
                                         .build();
         if (isBlocking) {
-            blockingStub.createWallet(request);
+            NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+            stubWithHeaders.createWallet(request);
         } else {
-            asyncStub.createWallet(request, new ClientNodeObserver<CreateWalletResponse>(commandNumber));
+            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+            stubWithHeaders.createWallet(request, new ClientNodeObserver<CreateWalletResponse>(commandNumber));
         }
     }
 
-    public void deleteWallet(String userId, String walletId, boolean isBlocking, long commandNumber) {
+    public void deleteWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber) {
         DeleteWalletRequest request = DeleteWalletRequest.newBuilder()
                                         .setUserId(userId)
                                         .setWalletId(walletId)
                                         .build();
         if (isBlocking) {
-            blockingStub.deleteWallet(request);
+            NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+            stubWithHeaders.deleteWallet(request);
         } else {
-            asyncStub.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber));
+            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+            stubWithHeaders.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber));
         }
     }
 
-    public void transfer(String srcUserId, String srcWalletId, String dstWalletId, long value, boolean isBlocking, long commandNumber) {
+    public void transfer(String srcUserId, String srcWalletId, String dstWalletId, long value, int delaySeconds, boolean isBlocking, long commandNumber) {
         TransferRequest request = TransferRequest.newBuilder()
                                                 .setSrcUserId(srcUserId)
                                                 .setSrcWalletId(srcWalletId)
@@ -79,21 +104,25 @@ public class ClientNodeService {
                                                 .setValue(value)
                                                 .build();
         if (isBlocking) {
-            blockingStub.transfer(request);
+            NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+            stubWithHeaders.transfer(request);
         } else {
-            asyncStub.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber));
+            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+            stubWithHeaders.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber));
         }
     }
 
-    public long readBalance(String walletId, boolean isBlocking, long commandNumber) {
+    public long readBalance(String walletId, int delaySeconds, boolean isBlocking, long commandNumber) {
         ReadBalanceRequest request = ReadBalanceRequest.newBuilder()
                                                         .setWalletId(walletId)
                                                         .build();
         if (isBlocking) {
-            ReadBalanceResponse response = blockingStub.readBalance(request);
+            NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+            ReadBalanceResponse response = stubWithHeaders.readBalance(request);
             return response.getBalance();
         } else {
-            asyncStub.readBalance(request, new ClientNodeObserver<pt.tecnico.blockchainist.contract.ReadBalanceResponse>(commandNumber));
+            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+            stubWithHeaders.readBalance(request, new ClientNodeObserver<pt.tecnico.blockchainist.contract.ReadBalanceResponse>(commandNumber));
         }
         return 0;
     }
