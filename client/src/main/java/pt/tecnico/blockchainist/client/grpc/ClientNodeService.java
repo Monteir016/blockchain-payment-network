@@ -7,16 +7,21 @@ import io.grpc.ManagedChannelBuilder;
 
 import java.util.List;
 
+import org.w3c.dom.Node;
+
+import pt.tecnico.blockchainist.client.grpc.ClientNodeObserver;
+
 
 /**
  * gRPC client for communicating with a blockchain node.
- * Encapsulates the managed channel and blocking stub.
+ * Encapsulates the managed channel and blocking blockingStub.
  * Exceptions are propagated to the caller (CommandProcessor).
  */
 public class ClientNodeService {
 
     private final ManagedChannel channel;
-    private final NodeServiceGrpc.NodeServiceBlockingStub stub;
+    private final NodeServiceGrpc.NodeServiceBlockingStub blockingStub;
+    private final NodeServiceGrpc.NodeServiceStub asyncStub;
 
     public ClientNodeService(String host, int port, String organization) {
         
@@ -38,57 +43,65 @@ public class ClientNodeService {
                 .usePlaintext() 
                 .build();
 
-        this.stub = NodeServiceGrpc.newBlockingStub(this.channel);
-        
+        this.blockingStub = NodeServiceGrpc.newBlockingStub(this.channel);
+        this.asyncStub = NodeServiceGrpc.newStub(this.channel);
     }
 
-    public void createWallet(String userId, String walletId) {
-        
+    public void createWallet(String userId, String walletId, boolean isBlocking, long commandNumber) {
         CreateWalletRequest request = CreateWalletRequest.newBuilder()
                                         .setUserId(userId)
                                         .setWalletId(walletId)
                                         .build();
-        stub.createWallet(request);
-        
+        if (isBlocking) {
+            blockingStub.createWallet(request);
+        } else {
+            asyncStub.createWallet(request, new ClientNodeObserver<CreateWalletResponse>(commandNumber));
+        }
     }
 
-    public void deleteWallet(String userId, String walletId) {
-
-        
+    public void deleteWallet(String userId, String walletId, boolean isBlocking, long commandNumber) {
         DeleteWalletRequest request = DeleteWalletRequest.newBuilder()
                                         .setUserId(userId)
                                         .setWalletId(walletId)
                                         .build();
-        stub.deleteWallet(request);
-        
+        if (isBlocking) {
+            blockingStub.deleteWallet(request);
+        } else {
+            asyncStub.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber));
+        }
     }
 
-    public void transfer(String srcUserId, String srcWalletId, String dstWalletId, long value) {
-
+    public void transfer(String srcUserId, String srcWalletId, String dstWalletId, long value, boolean isBlocking, long commandNumber) {
         TransferRequest request = TransferRequest.newBuilder()
                                                 .setSrcUserId(srcUserId)
                                                 .setSrcWalletId(srcWalletId)
                                                 .setDstWalletId(dstWalletId)
                                                 .setValue(value)
                                                 .build();
-        stub.transfer(request);
-        
+        if (isBlocking) {
+            blockingStub.transfer(request);
+        } else {
+            asyncStub.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber));
+        }
     }
 
-    public long readBalance(String walletId) {
-
+    public long readBalance(String walletId, boolean isBlocking, long commandNumber) {
         ReadBalanceRequest request = ReadBalanceRequest.newBuilder()
                                                         .setWalletId(walletId)
                                                         .build();
-        ReadBalanceResponse response = stub.readBalance(request);
-        return response.getBalance();
-        
+        if (isBlocking) {
+            ReadBalanceResponse response = blockingStub.readBalance(request);
+            return response.getBalance();
+        } else {
+            asyncStub.readBalance(request, new ClientNodeObserver<pt.tecnico.blockchainist.contract.ReadBalanceResponse>(commandNumber));
+        }
+        return 0;
     }
 
     public List<Transaction> getBlockchainState() {
         
         GetBlockchainStateRequest request = GetBlockchainStateRequest.newBuilder().build();
-        GetBlockchainStateResponse response = stub.getBlockchainState(request);
+        GetBlockchainStateResponse response = blockingStub.getBlockchainState(request);
         return response.getTransactionsList();
     
     }
