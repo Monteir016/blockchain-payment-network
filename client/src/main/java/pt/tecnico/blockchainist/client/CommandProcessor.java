@@ -42,9 +42,15 @@ public class CommandProcessor {
         Scanner scanner = new Scanner(System.in);
         boolean exit = false;
 
-        while (!exit) {
-            System.out.print("\n> ");
+        // Imprime o símbolo '>' antes do primeiro comando
+        System.out.print("\n> ");
+
+        while (!exit && scanner.hasNextLine()) {
             String line = scanner.nextLine().trim();
+            if (line.isEmpty()) {
+                System.out.print("\n> ");
+                continue;
+            }
             String[] split = line.split(SPACE);
             try {
                 switch (split[0]) {
@@ -100,6 +106,9 @@ public class CommandProcessor {
                 System.err.println("Error: " + e.getMessage());
                 printUsage();
             }
+            if (!exit) {
+                System.out.print("\n> ");
+            }
         }
         scanner.close();
     }
@@ -116,8 +125,10 @@ public class CommandProcessor {
 
         ClientNodeService node = this.nodes.get(nodeIndex);
         try {
-            node.createWallet(userId, walletId);
-            System.out.println("OK " + commandNumber);
+            node.createWallet(userId, walletId, isBlocking, commandNumber);
+            if (isBlocking) {
+                System.out.println("OK " + commandNumber);
+            }
         } catch (StatusRuntimeException e) {
             System.err.println(e.getStatus().getDescription());
         }
@@ -136,10 +147,12 @@ public class CommandProcessor {
 
         ClientNodeService node = this.nodes.get(nodeIndex);
         try {
-            node.deleteWallet(userId, walletId);
-            System.out.println("OK " + commandNumber);
+            node.deleteWallet(userId, walletId, isBlocking, commandNumber);
+            if (isBlocking) {
+                System.out.println("OK " + commandNumber);
+            }
         } catch (StatusRuntimeException e) {
-            System.err.println(e.getStatus().getDescription());;
+            System.err.println(e.getStatus().getDescription());
         }
 
     }
@@ -155,13 +168,14 @@ public class CommandProcessor {
 
         ClientNodeService node = this.nodes.get(nodeIndex);
         try {
-            long balance = node.readBalance(walletId);
-            System.out.println("OK " + commandNumber);
-            System.out.println(balance);
+            long balance = node.readBalance(walletId, isBlocking, commandNumber);
+            if (isBlocking) {
+                System.out.println("OK " + commandNumber);
+                System.out.println(balance);
+            }
         } catch (StatusRuntimeException e) {
             System.err.println(e.getStatus().getDescription());
         }
-
     }
 
     private void transfer(String[] split, boolean isBlocking) {
@@ -179,8 +193,10 @@ public class CommandProcessor {
         ClientNodeService node = this.nodes.get(nodeIndex);
 
         try {
-            node.transfer(sourceUserId, sourceWalletId, destinationWalletId, amount);
-            System.out.println("OK " + commandNumber);
+            node.transfer(sourceUserId, sourceWalletId, destinationWalletId, amount, isBlocking, commandNumber);
+            if (isBlocking) {
+                System.out.println("OK " + commandNumber);
+            }
         } catch (StatusRuntimeException e) {
             System.err.println(e.getStatus().getDescription());
         }
