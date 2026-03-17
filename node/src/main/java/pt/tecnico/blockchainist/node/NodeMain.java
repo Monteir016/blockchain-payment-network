@@ -3,9 +3,11 @@ package pt.tecnico.blockchainist.node;
 import io.grpc.BindableService;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.ServerInterceptors;
 
 import pt.tecnico.blockchainist.node.domain.ApplicationPipeline;
 import pt.tecnico.blockchainist.node.domain.NodeState;
+import pt.tecnico.blockchainist.node.grpc.DelayMetadataServerInterceptor;
 import pt.tecnico.blockchainist.node.grpc.NodeServiceImpl;
 import pt.tecnico.blockchainist.node.grpc.NodeSequencerService;
 
@@ -51,7 +53,7 @@ public class NodeMain {
 
         try {
             final Server server = ServerBuilder.forPort(port)
-                    .addService(impl)
+                    .addService(ServerInterceptors.intercept(impl, new DelayMetadataServerInterceptor()))
                     .build();
             server.start();
             System.out.println("Server started, listening on " + port);
