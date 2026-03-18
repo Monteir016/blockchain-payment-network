@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class ApplicationPipeline implements Runnable {
 
-    private static final int POLL_MS = 50;
+    private static final int POLL_MS = 100;
 
     private final NodeState nodeState;
     private final NodeSequencerService sequencerService;
@@ -64,20 +64,25 @@ public class ApplicationPipeline implements Runnable {
         while (running) {
             int next = nextBlockIndex.get();
             Optional<DeliverBlockResponse> opt;
+            boolean debug = Boolean.getBoolean("debug");
             try {
                 opt = sequencerService.tryDeliverBlock(next);
             } catch (io.grpc.StatusRuntimeException e) {
-                System.err.println("[Pipeline] Sequencer unavailable: " + e.getStatus() + " — retrying...");
+                if (debug) System.err.println("[DEBUG] [Pipeline] Sequencer unavailable: " + e.getStatus() + "  retrying...");
                 sleepOrStop(POLL_MS * 20);
                 continue;
             }
             if (opt.isPresent()) {
                 Block block = opt.get().getBlock();
+                if (debug) System.err.printf("[DEBUG] [Pipeline] Received block %d with %d txs\n", block.getBlockId(), block.getTransactionsCount());
                 for (Transaction tx : block.getTransactionsList()) {
                     try {
+                        if (debug) System.err.printf("[DEBUG] [Pipeline] Applying tx: %s\n", tx);
                         nodeState.executeTransaction(tx);
+                        if (debug) System.err.printf("[DEBUG] [Pipeline] Applied tx: %s\n", tx);
                         completeFirstPendingFor(tx, null);
                     } catch (Throwable e) {
+                        if (debug) System.err.printf("[DEBUG] [Pipeline] Error applying tx: %s\n", tx);
                         completeFirstPendingFor(tx, e);
                     }
                 }

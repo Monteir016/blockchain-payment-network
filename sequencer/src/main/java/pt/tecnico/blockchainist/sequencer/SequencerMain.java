@@ -12,8 +12,13 @@ import java.util.concurrent.ScheduledExecutorService;
 
 public class SequencerMain {
     public static void main(String[] args) {
+        boolean debug = Boolean.getBoolean("debug");
+        if (debug) {
+            System.err.println("[DEBUG] Debug mode enabled");
+            System.err.println("[DEBUG] Args: " + java.util.Arrays.toString(args));
+        }
 
-        System.out.println(SequencerMain.class.getSimpleName());
+        if (debug) System.err.println("[DEBUG] " + SequencerMain.class.getSimpleName());
 
         // Validate arguments
         if (args.length < 1) {
@@ -33,6 +38,10 @@ public class SequencerMain {
         } catch (NumberFormatException e) {
             System.err.println("Invalid numeric argument: " + e.getMessage());
             System.err.printf("Usage: java %s <port> [maxTransactionsPerBlock] [blockTimeoutSeconds]%n", SequencerMain.class.getName());
+            if (debug) {
+                System.err.println("[DEBUG] Exception stack trace:");
+                e.printStackTrace(System.err);
+            }
             return;
         }
 
@@ -56,24 +65,29 @@ public class SequencerMain {
                                                         blockTimeoutSeconds, scheduler);
         final BindableService impl = new SequencerServiceImpl(state);
 
-
         // Start gRPC server
         try {
+            if (debug) System.err.println("[DEBUG] Starting gRPC server");
             final Server server = ServerBuilder.forPort(port).addService(impl).build();
             server.start();
-            System.out.println("Sequencer started, listening on port " + port);
-            System.out.println("Block policy: N=" + maxTransactionsPerBlock + ", T=" + blockTimeoutSeconds + "s");
-
+            if (debug) {
+                System.err.println("[DEBUG] Sequencer started, listening on port " + port);
+                System.err.println("[DEBUG] Block policy: N=" + maxTransactionsPerBlock + ", T=" + blockTimeoutSeconds + "s");
+            }
 
             // Register shutdown hook for graceful termination
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Shutting down sequencer...");
+                if (debug) System.err.println("[DEBUG] Shutting down sequencer...");
                 server.shutdown();
             }));
 
             server.awaitTermination();
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Erro fatal: " + e.getMessage());
+            if (debug) {
+                System.err.println("[DEBUG] Exception stack trace:");
+                e.printStackTrace(System.err);
+            }
         }
     }
 }

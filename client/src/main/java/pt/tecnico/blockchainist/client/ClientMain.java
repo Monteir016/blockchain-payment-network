@@ -7,7 +7,11 @@ import pt.tecnico.blockchainist.client.grpc.ClientNodeService;
 public class ClientMain {
 
     public static void main(String[] args) {
-
+        boolean debug = Boolean.getBoolean("debug");
+        if (debug) {
+            System.err.println("[DEBUG] Debug mode enabled");
+            System.err.println("[DEBUG] Args: " + java.util.Arrays.toString(args));
+        }
         System.out.println(ClientMain.class.getSimpleName());
 
         // check arguments
@@ -42,15 +46,26 @@ public class ClientMain {
             }
             String organization = split[2];
 
-            nodes.add(new ClientNodeService(host, port, organization));
+            if (debug) System.err.printf("[DEBUG] Adding node: %s:%d:%s\n", host, port, organization);
+            nodes.add(new ClientNodeService(host, port, organization, debug));
         }
 
-        CommandProcessor processor = new CommandProcessor(nodes);
-        processor.userInputLoop();
-
-        // Shutdown all gRPC channels before exiting
-        for (ClientNodeService node : nodes) {
-            node.shutdown();
+        try {
+            if (debug) System.err.println("[DEBUG] Creating CommandProcessor");
+            CommandProcessor processor = new CommandProcessor(nodes);
+            if (debug) System.err.println("[DEBUG] Entering user input loop");
+            processor.userInputLoop();
+        } catch (Exception e) {
+            System.err.println("Erro fatal: " + e.getMessage());
+            if (debug) {
+                System.err.println("[DEBUG] Exception stack trace:");
+                e.printStackTrace(System.err);
+            }
+        } finally {
+            // Shutdown all gRPC channels before exiting
+            for (ClientNodeService node : nodes) {
+                node.shutdown();
+            }
         }
     }
 

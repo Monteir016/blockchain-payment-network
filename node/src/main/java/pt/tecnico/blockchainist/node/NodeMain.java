@@ -18,19 +18,26 @@ import java.util.Optional;
 
 public class NodeMain {
     public static void main(String[] args) {
+        boolean debug = Boolean.getBoolean("debug");
+        if (debug) {
+            System.err.println("[DEBUG] Debug mode enabled");
+            System.err.println("[DEBUG] Args: " + java.util.Arrays.toString(args));
+        }
 
         // Log received arguments
-        System.out.printf("Received %d arguments%n", args.length);
-		for (int i = 0; i < args.length; i++) {
-			System.out.printf("arg[%d] = %s%n", i, args[i]);
-		}
+        if (debug) {
+            System.err.printf("[DEBUG] Received %d arguments\n", args.length);
+            for (int i = 0; i < args.length; i++) {
+                System.err.printf("[DEBUG] arg[%d] = %s\n", i, args[i]);
+            }
+        }
 
-		// Validate argument count
-		if (args.length < 3) {
-			System.err.println("Argument(s) missing!");
+        // Validate argument count
+        if (args.length < 3) {
+            System.err.println("Argument(s) missing!");
             System.err.printf("Usage: java %s <port> <organization> <sequencerHost:sequencerPort>%n", NodeMain.class.getName());
-			return;
-		}
+            return;
+        }
 
         // Parse arguments: port, organization name, sequencer address
         final int port = Integer.parseInt(args[0]);
@@ -45,6 +52,8 @@ public class NodeMain {
         }
         String sequencerHost = sequencerParts[0];
         int sequencerPort = Integer.parseInt(sequencerParts[1]);
+
+        if (debug) System.err.printf("[DEBUG] Connecting to sequencer at %s:%d\n", sequencerHost, sequencerPort);
 
         // Create gRPC client for the sequencer
         NodeSequencerService sequencerService = new NodeSequencerService(sequencerHost, sequencerPort);
@@ -62,20 +71,25 @@ public class NodeMain {
         final BindableService impl = new NodeServiceImpl(nodeState, sequencerService, applicationPipeline);
 
         try {
+            if (debug) System.err.println("[DEBUG] Starting gRPC server");
             final Server server = ServerBuilder.forPort(port)
                     .addService(ServerInterceptors.intercept(impl, new DelayMetadataServerInterceptor()))
                     .build();
             server.start();
-            System.out.println("Server started, listening on " + port);
+            if (debug) System.err.println("[DEBUG] Server started, listening on " + port);
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Shutting down server...");
+                if (debug) System.err.println("[DEBUG] Shutting down server...");
                 applicationPipeline.stop();
                 server.shutdown();
                 sequencerService.shutdown();
             }));
             server.awaitTermination();
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Erro fatal: " + e.getMessage());
+            if (debug) {
+                System.err.println("[DEBUG] Exception stack trace:");
+                e.printStackTrace(System.err);
+            }
         }
     }
 
@@ -84,7 +98,8 @@ public class NodeMain {
     private static final long BOOTSTRAP_RETRY_MS   = 1_000;
 
     private static int bootstrapSync(NodeState nodeState, NodeSequencerService sequencerService) {
-        System.out.println("Bootstrap sync: fetching existing blocks from sequencer...");
+        boolean debug = Boolean.getBoolean("debug");
+        if (debug) System.err.println("[DEBUG] Bootstrap sync: fetching existing blocks from sequencer...");
         int blockIndex = 0;
         long deadline = System.currentTimeMillis() + BOOTSTRAP_TIMEOUT_MS;
 
@@ -124,7 +139,7 @@ public class NodeMain {
             blockIndex++;
         }
 
-        System.out.printf("Bootstrap sync complete: %d block(s) applied.%n", blockIndex);
+        if (debug) System.err.printf("[DEBUG] Bootstrap sync complete: %d block(s) applied.%n", blockIndex);
         return blockIndex;
     }
 }
