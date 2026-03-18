@@ -67,7 +67,6 @@ public class ApplicationPipeline implements Runnable {
             try {
                 opt = sequencerService.tryDeliverBlock(next);
             } catch (io.grpc.StatusRuntimeException e) {
-                // Sequencer temporarily unreachable; back off and retry
                 System.err.println("[Pipeline] Sequencer unavailable: " + e.getStatus() + " — retrying...");
                 sleepOrStop(POLL_MS * 20);
                 continue;

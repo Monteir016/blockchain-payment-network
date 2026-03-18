@@ -2,6 +2,7 @@ package pt.tecnico.blockchainist.node.grpc;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
 import pt.tecnico.blockchainist.contract.*;
@@ -44,9 +45,15 @@ public class NodeSequencerService {
     }
 
     /**
-     * Requests block by index from the sequencer
+     * Requests block by index from the sequencer.
+     *
      * @param blockId block index (0-based)
-     * @return the response with block if available, or empty if block not yet closed
+     * @return the response if the block is available, or empty if the block has
+     *         not been closed yet (sequencer returns NOT_FOUND / available=false)
+     * @throws StatusRuntimeException if the sequencer is unreachable (UNAVAILABLE)
+     *         or another unexpected gRPC error occurs — callers that need to
+     *         distinguish "not ready" from "sequencer down" should inspect the
+     *         thrown exception's status code
      */
     public java.util.Optional<DeliverBlockResponse> tryDeliverBlock(int blockId) {
         DeliverBlockRequest request = DeliverBlockRequest.newBuilder()
@@ -54,10 +61,23 @@ public class NodeSequencerService {
                 .build();
         try {
             DeliverBlockResponse response = stub.deliverBlock(request);
+            // Some sequencer implementations signal unavailability via the
+            // available flag rather than by throwing.
+            if (!response.getAvailable()) {
+                return java.util.Optional.empty();
+            }
             return java.util.Optional.of(response);
         } catch (StatusRuntimeException e) {
-            // Block not yet available
-            return java.util.Optional.empty();
+            Status.Code code = e.getStatus().getCode();
+            if (code == Status.Code.NOT_FOUND
+                    || code == Status.Code.OUT_OF_RANGE
+                    || code == Status.Code.INVALID_ARGUMENT) {
+                // Block not yet closed — expected stop condition during polling/bootstrap
+                return java.util.Optional.empty();
+            }
+            // Any other error (UNAVAILABLE, INTERNAL, …) is re-thrown so callers
+            // can decide whether to retry or abort.
+            throw e;
         }
     }
 
