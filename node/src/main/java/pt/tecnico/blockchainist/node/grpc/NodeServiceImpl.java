@@ -33,9 +33,17 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
         this.applicationPipeline = applicationPipeline;
     }
 
+    private void applyRequestDelayIfAny() throws InterruptedException {
+        Integer delaySeconds = DelayMetadataServerInterceptor.DELAY_SECONDS_CTX_KEY.get();
+        if (delaySeconds != null && delaySeconds > 0) {
+            TimeUnit.SECONDS.sleep(delaySeconds);
+        }
+    }
+
     @Override
     public void createWallet(CreateWalletRequest request, StreamObserver<CreateWalletResponse> responseObserver) {
         try {
+            applyRequestDelayIfAny();
             Transaction tx = Transaction.newBuilder()
                     .setCreateWallet(request)
                     .build();
@@ -56,6 +64,9 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
             } else {
                 responseObserver.onError(Status.INTERNAL.withDescription(cause != null ? cause.getMessage() : e.getMessage()).asRuntimeException());
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            responseObserver.onError(Status.CANCELLED.withDescription("Request interrupted while waiting delay").asRuntimeException());
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
         } catch (Throwable e) {
@@ -66,6 +77,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     @Override
     public void deleteWallet(DeleteWalletRequest request, StreamObserver<DeleteWalletResponse> responseObserver) {
         try {
+            applyRequestDelayIfAny();
             Transaction tx = Transaction.newBuilder()
                     .setDeleteWallet(request)
                     .build();
@@ -87,6 +99,9 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
             } else {
                 responseObserver.onError(Status.INTERNAL.withDescription(cause != null ? cause.getMessage() : e.getMessage()).asRuntimeException());
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            responseObserver.onError(Status.CANCELLED.withDescription("Request interrupted while waiting delay").asRuntimeException());
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
         } catch (Throwable e) {
@@ -97,6 +112,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     @Override
     public void transfer(TransferRequest request, StreamObserver<TransferResponse> responseObserver) {
         try {
+            applyRequestDelayIfAny();
             Transaction tx = Transaction.newBuilder()
                     .setTransfer(request)
                     .build();
@@ -118,6 +134,9 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
             } else {
                 responseObserver.onError(Status.INTERNAL.withDescription(cause != null ? cause.getMessage() : e.getMessage()).asRuntimeException());
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            responseObserver.onError(Status.CANCELLED.withDescription("Request interrupted while waiting delay").asRuntimeException());
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
         } catch (Throwable e) {
@@ -128,10 +147,14 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     @Override
     public void readBalance(ReadBalanceRequest request, StreamObserver<ReadBalanceResponse> responseObserver) {
         try {
+            applyRequestDelayIfAny();
             long balance = nodeState.readBalance(request.getWalletId());
             ReadBalanceResponse response = ReadBalanceResponse.newBuilder().setBalance(balance).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            responseObserver.onError(Status.CANCELLED.withDescription("Request interrupted while waiting delay").asRuntimeException());
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
         }
