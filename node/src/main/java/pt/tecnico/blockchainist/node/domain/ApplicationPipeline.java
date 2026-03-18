@@ -63,7 +63,15 @@ public class ApplicationPipeline implements Runnable {
     public void run() {
         while (running) {
             int next = nextBlockIndex.get();
-            Optional<DeliverBlockResponse> opt = sequencerService.tryDeliverBlock(next);
+            Optional<DeliverBlockResponse> opt;
+            try {
+                opt = sequencerService.tryDeliverBlock(next);
+            } catch (io.grpc.StatusRuntimeException e) {
+                // Sequencer temporarily unreachable; back off and retry
+                System.err.println("[Pipeline] Sequencer unavailable: " + e.getStatus() + " — retrying...");
+                sleepOrStop(POLL_MS * 20);
+                continue;
+            }
             if (opt.isPresent()) {
                 Block block = opt.get().getBlock();
                 for (Transaction tx : block.getTransactionsList()) {
@@ -76,14 +84,17 @@ public class ApplicationPipeline implements Runnable {
                 }
                 nextBlockIndex.incrementAndGet();
             } else {
-                try {
-                    Thread.sleep(POLL_MS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    running = false;
-                    break;
-                }
+                sleepOrStop(POLL_MS);
             }
+        }
+    }
+
+    private void sleepOrStop(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            running = false;
         }
     }
 
