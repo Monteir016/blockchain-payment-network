@@ -125,7 +125,7 @@ public class CommandProcessor {
 
         ClientNodeService node = this.nodes.get(nodeIndex);
         try {
-            node.createWallet(userId, walletId, isBlocking, commandNumber);
+            node.createWallet(userId, walletId, nodeDelay, isBlocking, commandNumber);
             if (isBlocking) {
                 System.out.println("OK " + commandNumber);
             }
@@ -147,7 +147,7 @@ public class CommandProcessor {
 
         ClientNodeService node = this.nodes.get(nodeIndex);
         try {
-            node.deleteWallet(userId, walletId, isBlocking, commandNumber);
+            node.deleteWallet(userId, walletId, nodeDelay, isBlocking, commandNumber);
             if (isBlocking) {
                 System.out.println("OK " + commandNumber);
             }
@@ -168,7 +168,7 @@ public class CommandProcessor {
 
         ClientNodeService node = this.nodes.get(nodeIndex);
         try {
-            long balance = node.readBalance(walletId, isBlocking, commandNumber);
+            long balance = node.readBalance(walletId, nodeDelay, isBlocking, commandNumber);
             if (isBlocking) {
                 System.out.println("OK " + commandNumber);
                 System.out.println(balance);
@@ -193,7 +193,7 @@ public class CommandProcessor {
         ClientNodeService node = this.nodes.get(nodeIndex);
 
         try {
-            node.transfer(sourceUserId, sourceWalletId, destinationWalletId, amount, isBlocking, commandNumber);
+            node.transfer(sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, isBlocking, commandNumber);
             if (isBlocking) {
                 System.out.println("OK " + commandNumber);
             }
