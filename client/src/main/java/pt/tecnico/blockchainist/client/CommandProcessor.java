@@ -14,6 +14,7 @@ import io.grpc.StatusRuntimeException;
 
 /** Reads user commands from stdin, dispatches gRPC calls, and prints results. */
 public class CommandProcessor {
+    private final boolean debug = Boolean.getBoolean("debug");
 
     private static final String SPACE = " ";
     private static final String CREATE_BLOCKING = "C";
@@ -124,13 +125,22 @@ public class CommandProcessor {
         Integer nodeDelay = Integer.parseInt(split[4]);
 
         ClientNodeService node = this.nodes.get(nodeIndex);
+        if (debug) System.err.printf("[DEBUG] Sending CreateWallet to node %d: userId=%s, walletId=%s, delay=%d, blocking=%b, cmd=%d\n", nodeIndex, userId, walletId, nodeDelay, isBlocking, commandNumber);
         try {
             node.createWallet(userId, walletId, nodeDelay, isBlocking, commandNumber);
             if (isBlocking) {
+                if (debug) System.err.printf("[DEBUG] Received CreateWallet response for cmd=%d\n", commandNumber);
                 System.out.println("OK " + commandNumber);
             }
         } catch (StatusRuntimeException e) {
+            if (debug) System.err.printf("[DEBUG] CreateWallet gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
             System.err.println(e.getStatus().getDescription());
+        } catch (Exception e) {
+            System.err.println("Node " + nodeIndex + " is unreachable");
+            if (debug) {
+                System.err.println("[DEBUG] Exception stack trace:");
+                e.printStackTrace(System.err);
+            }
         }
     
     }
@@ -146,13 +156,22 @@ public class CommandProcessor {
         Integer nodeDelay = Integer.parseInt(split[4]);
 
         ClientNodeService node = this.nodes.get(nodeIndex);
+        if (debug) System.err.printf("[DEBUG] Sending DeleteWallet to node %d: userId=%s, walletId=%s, delay=%d, blocking=%b, cmd=%d\n", nodeIndex, userId, walletId, nodeDelay, isBlocking, commandNumber);
         try {
             node.deleteWallet(userId, walletId, nodeDelay, isBlocking, commandNumber);
             if (isBlocking) {
+                if (debug) System.err.printf("[DEBUG] Received DeleteWallet response for cmd=%d\n", commandNumber);
                 System.out.println("OK " + commandNumber);
             }
         } catch (StatusRuntimeException e) {
+            if (debug) System.err.printf("[DEBUG] DeleteWallet gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
             System.err.println(e.getStatus().getDescription());
+        } catch (Exception e) {
+            System.err.println("Node " + nodeIndex + " is unreachable");
+            if (debug) {
+                System.err.println("[DEBUG] Exception stack trace:");
+                e.printStackTrace(System.err);
+            }
         }
 
     }
@@ -167,14 +186,23 @@ public class CommandProcessor {
         Integer nodeDelay = Integer.parseInt(split[3]);
 
         ClientNodeService node = this.nodes.get(nodeIndex);
+        if (debug) System.err.printf("[DEBUG] Sending ReadBalance to node %d: walletId=%s, delay=%d, blocking=%b, cmd=%d\n", nodeIndex, walletId, nodeDelay, isBlocking, commandNumber);
         try {
             long balance = node.readBalance(walletId, nodeDelay, isBlocking, commandNumber);
             if (isBlocking) {
+                if (debug) System.err.printf("[DEBUG] Received ReadBalance response for cmd=%d: balance=%d\n", commandNumber, balance);
                 System.out.println("OK " + commandNumber);
                 System.out.println(balance);
             }
         } catch (StatusRuntimeException e) {
+            if (debug) System.err.printf("[DEBUG] ReadBalance gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
             System.err.println(e.getStatus().getDescription());
+        } catch (Exception e) {
+            System.err.println("Node " + nodeIndex + " is unreachable");
+            if (debug) {
+                System.err.println("[DEBUG] Exception stack trace:");
+                e.printStackTrace(System.err);
+            }
         }
     }
 
@@ -192,13 +220,22 @@ public class CommandProcessor {
 
         ClientNodeService node = this.nodes.get(nodeIndex);
 
+        if (debug) System.err.printf("[DEBUG] Sending Transfer to node %d: srcUserId=%s, srcWalletId=%s, dstWalletId=%s, amount=%d, delay=%d, blocking=%b, cmd=%d\n", nodeIndex, sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, isBlocking, commandNumber);
         try {
             node.transfer(sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, isBlocking, commandNumber);
             if (isBlocking) {
+                if (debug) System.err.printf("[DEBUG] Received Transfer response for cmd=%d\n", commandNumber);
                 System.out.println("OK " + commandNumber);
             }
         } catch (StatusRuntimeException e) {
+            if (debug) System.err.printf("[DEBUG] Transfer gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
             System.err.println(e.getStatus().getDescription());
+        } catch (Exception e) {
+            System.err.println("Node " + nodeIndex + " is unreachable");
+            if (debug) {
+                System.err.println("[DEBUG] Exception stack trace:");
+                e.printStackTrace(System.err);
+            }
         }
     }
 
@@ -211,14 +248,23 @@ public class CommandProcessor {
 
         ClientNodeService node = this.nodes.get(nodeIndex);
 
+        if (debug) System.err.printf("[DEBUG] Sending GetBlockchainState to node %d, cmd=%d\n", nodeIndex, commandNumber);
         try {
             List<Transaction> blockchainState = node.getBlockchainState();
+            if (debug) System.err.printf("[DEBUG] Received GetBlockchainState response for cmd=%d: %d txs\n", commandNumber, blockchainState.size());
             System.out.println("OK " + commandNumber);
             for (Transaction tx : blockchainState) {
                 System.out.println(tx);
             }
         } catch (StatusRuntimeException e) {
+            if (debug) System.err.printf("[DEBUG] GetBlockchainState gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
             System.err.println(e.getStatus().getDescription());
+        } catch (Exception e) {
+            System.err.println("Node " + nodeIndex + " is unreachable");
+            if (debug) {
+                System.err.println("[DEBUG] Exception stack trace:");
+                e.printStackTrace(System.err);
+            }
         }
 
     }

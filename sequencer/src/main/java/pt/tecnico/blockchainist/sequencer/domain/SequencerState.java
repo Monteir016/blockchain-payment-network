@@ -38,21 +38,26 @@ public class SequencerState {
 
     public synchronized int addTransaction(Transaction transaction) {
 
+        boolean debug = Boolean.getBoolean("debug");
         transactions.add(transaction);
         boolean blockWasEmpty = openBlockTransactions.isEmpty();
         openBlockTransactions.add(transaction);
+        if (debug) System.err.printf("[DEBUG] [Sequencer] Received transaction: %s\n", transaction);
 
         // First transaction -> Start timer
         if (blockWasEmpty) {
+            if (debug) System.err.println("[DEBUG] [Sequencer] First transaction in block, starting timer");
             startTimeoutTimer();
         }
         if (openBlockTransactions.size() >= maxTransactionsPerBlock) {
+            if (debug) System.err.println("[DEBUG] [Sequencer] Block full, closing block");
             closeOpenBlock();
         }
         return transactions.size() - 1;
     }
 
     private void closeOpenBlock() {
+        boolean debug = Boolean.getBoolean("debug");
         if (openBlockTransactions.isEmpty()) {
             return;
         }
@@ -69,13 +74,13 @@ public class SequencerState {
             .build();
         blocks.add(closedBlock);
 
-        System.out.println("[Sequencer] Closing Block " + blockId + " with " + txCount + " transactions.");
+        if (debug) System.err.println("[DEBUG] [Sequencer] Closing Block " + blockId + " with " + txCount + " transactions.");
         openBlockTransactions.clear();
     }
 
     public synchronized void closeOpenBlockOnTimeout() {
-
-        System.out.println("[Sequencer] Open Block Timeout (" + blockTimeoutSeconds + "s)");
+        boolean debug = Boolean.getBoolean("debug");
+        if (debug) System.err.println("[DEBUG] [Sequencer] Open Block Timeout (" + blockTimeoutSeconds + "s)");
         closeOpenBlock();
     }
 
