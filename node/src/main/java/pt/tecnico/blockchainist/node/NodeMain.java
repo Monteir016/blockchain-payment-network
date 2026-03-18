@@ -5,11 +5,16 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptors;
 
+import pt.tecnico.blockchainist.contract.Block;
+import pt.tecnico.blockchainist.contract.DeliverBlockResponse;
+import pt.tecnico.blockchainist.contract.Transaction;
 import pt.tecnico.blockchainist.node.domain.ApplicationPipeline;
 import pt.tecnico.blockchainist.node.domain.NodeState;
 import pt.tecnico.blockchainist.node.grpc.DelayMetadataServerInterceptor;
 import pt.tecnico.blockchainist.node.grpc.NodeServiceImpl;
 import pt.tecnico.blockchainist.node.grpc.NodeSequencerService;
+
+import java.util.Optional;
 
 public class NodeMain {
     public static void main(String[] args) {
@@ -44,9 +49,14 @@ public class NodeMain {
         // Create gRPC client for the sequencer
         NodeSequencerService sequencerService = new NodeSequencerService(sequencerHost, sequencerPort);
 
-        // Create domain state and application pipeline
+        // Create domain state
         NodeState nodeState = new NodeState();
+
+        int syncedBlocks = bootstrapSync(nodeState, sequencerService);
+
+        // Start the application pipeline from the first block not yet applied.
         ApplicationPipeline applicationPipeline = new ApplicationPipeline(nodeState, sequencerService);
+        applicationPipeline.setNextBlockIndex(syncedBlocks);
         applicationPipeline.start();
 
         final BindableService impl = new NodeServiceImpl(nodeState, sequencerService, applicationPipeline);
@@ -67,5 +77,54 @@ public class NodeMain {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    // Maximum time to wait for the sequencer to become reachable at startup
+    private static final long BOOTSTRAP_TIMEOUT_MS = 30_000;
+    private static final long BOOTSTRAP_RETRY_MS   = 1_000;
+
+    private static int bootstrapSync(NodeState nodeState, NodeSequencerService sequencerService) {
+        System.out.println("Bootstrap sync: fetching existing blocks from sequencer...");
+        int blockIndex = 0;
+        long deadline = System.currentTimeMillis() + BOOTSTRAP_TIMEOUT_MS;
+
+        while (true) {
+            Optional<DeliverBlockResponse> opt;
+            try {
+                opt = sequencerService.tryDeliverBlock(blockIndex);
+            } catch (io.grpc.StatusRuntimeException e) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    System.err.printf("[Bootstrap] Sequencer unreachable after %ds — starting with %d block(s).%n",
+                            BOOTSTRAP_TIMEOUT_MS / 1000, blockIndex);
+                    break;
+                }
+                System.err.printf("[Bootstrap] Sequencer unreachable (%s), retrying in %ds...%n",
+                        e.getStatus().getCode(), BOOTSTRAP_RETRY_MS / 1000);
+                try { Thread.sleep(BOOTSTRAP_RETRY_MS); } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                continue;
+            }
+
+            if (opt.isEmpty()) {
+                break;
+            }
+
+            Block block = opt.get().getBlock();
+            for (Transaction tx : block.getTransactionsList()) {
+                try {
+                    nodeState.executeTransaction(tx);
+                } catch (Exception e) {
+                    System.err.printf("[Bootstrap] Error applying tx in block %d: %s%n",
+                            blockIndex, e.getMessage());
+                }
+            }
+            blockIndex++;
+        }
+
+        System.out.printf("Bootstrap sync complete: %d block(s) applied.%n", blockIndex);
+        return blockIndex;
     }
 }
