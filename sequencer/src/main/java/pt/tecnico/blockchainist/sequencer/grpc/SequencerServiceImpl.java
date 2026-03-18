@@ -55,22 +55,26 @@ public class SequencerServiceImpl extends SequencerServiceGrpc.SequencerServiceI
         }
     }
 
+    @Override
     public void deliverBlock(DeliverBlockRequest request,
-                                StreamObserver<DeliverBlockResponse> responseObserver) {
+                             StreamObserver<DeliverBlockResponse> responseObserver) {
         try {
             int blockId = request.getBlockId();
             Block block = state.getBlock(blockId);
 
             DeliverBlockResponse response = DeliverBlockResponse.newBuilder()
+                    .setAvailable(true)
                     .setBlock(block)
                     .build();
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (IllegalArgumentException e) {
-            responseObserver.onError(
-                Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException()
-            );
+            DeliverBlockResponse response = DeliverBlockResponse.newBuilder()
+                    .setAvailable(false)
+                    .build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
         }
     }
 }
