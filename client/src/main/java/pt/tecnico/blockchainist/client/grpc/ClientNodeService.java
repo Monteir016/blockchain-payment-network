@@ -9,9 +9,7 @@ import io.grpc.stub.MetadataUtils;
 
 import java.util.List;
 
-import org.w3c.dom.Node;
 
-import pt.tecnico.blockchainist.client.grpc.ClientNodeObserver;
 
 
 /**
@@ -27,9 +25,10 @@ public class ClientNodeService {
     private final ManagedChannel channel;
     private final NodeServiceGrpc.NodeServiceBlockingStub blockingStub;
     private final NodeServiceGrpc.NodeServiceStub asyncStub;
+    private final boolean debug;
 
-    public ClientNodeService(String host, int port, String organization) {
-        
+    public ClientNodeService(String host, int port, String organization, boolean debug) {
+        this.debug = debug;
         // Input validation
         if (host == null || host.isEmpty()) {
             throw new IllegalArgumentException("Host cannot be null or empty");
@@ -42,7 +41,6 @@ public class ClientNodeService {
         if (organization == null || organization.isEmpty()) {
             throw new IllegalArgumentException("Organization cannot be null or empty");
         }
-        
         // Channel creation
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext() 
@@ -78,7 +76,7 @@ public class ClientNodeService {
             stubWithHeaders.createWallet(request);
         } else {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-            stubWithHeaders.createWallet(request, new ClientNodeObserver<CreateWalletResponse>(commandNumber));
+            stubWithHeaders.createWallet(request, new ClientNodeObserver<CreateWalletResponse>(commandNumber, debug));
         }
     }
 
@@ -92,7 +90,7 @@ public class ClientNodeService {
             stubWithHeaders.deleteWallet(request);
         } else {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-            stubWithHeaders.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber));
+            stubWithHeaders.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber, debug));
         }
     }
 
@@ -108,7 +106,7 @@ public class ClientNodeService {
             stubWithHeaders.transfer(request);
         } else {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-            stubWithHeaders.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber));
+            stubWithHeaders.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber, debug));
         }
     }
 
@@ -122,7 +120,7 @@ public class ClientNodeService {
             return response.getBalance();
         } else {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-            stubWithHeaders.readBalance(request, new ClientNodeObserver<pt.tecnico.blockchainist.contract.ReadBalanceResponse>(commandNumber));
+                stubWithHeaders.readBalance(request, new ClientNodeObserver<pt.tecnico.blockchainist.contract.ReadBalanceResponse>(commandNumber, debug));
         }
         return 0;
     }
