@@ -41,17 +41,44 @@ public class NodeMain {
 
         // Parse arguments: port, organization name, sequencer address
         final int port = Integer.parseInt(args[0]);
+                if (port < 0 || port > 65535) {
+                    System.err.println("Error: invalid port number. Must be between 0 and 65535.");
+                    return;
+                }
         final String organization = args[1];
+                if (organization == null || organization.trim().isEmpty()) {
+                    System.err.println("Error: organization name cannot be empty.");
+                    return;
+                }
         final String sequencerAddress = args[2];
+        if (sequencerAddress == null || sequencerAddress.trim().isEmpty()) {
+            System.err.println("Error: sequencerAddress cannot be empty.");
+            return;
+        }
 
         // Parse sequencer host and port from address string
         String[] sequencerParts = sequencerAddress.split(":");  
         if (sequencerParts.length != 2) {
-            System.err.println("Invalid sequencerId format. Expected host:port");
+            System.err.println("Error: invalid sequencerAddress format. Expected host:port.");
             return;
         }
         String sequencerHost = sequencerParts[0];
-        int sequencerPort = Integer.parseInt(sequencerParts[1]);
+        int sequencerPort;
+        try {
+            sequencerPort = Integer.parseInt(sequencerParts[1]);
+        } catch (NumberFormatException e) {
+            System.err.println("Error: invalid sequencer port.");
+            return;
+        }
+        if (sequencerPort < 0 || sequencerPort > 65535) {
+            System.err.println("Error: sequencer port out of valid range (0-65535).");
+            return;
+        }
+        // Prevent node from using same address as sequencer
+        if (port == sequencerPort && (sequencerHost.equals("localhost") || sequencerHost.equals("127.0.0.1"))) {
+            System.err.println("Error: node address (host:port) cannot be the same as sequencer address.");
+            return;
+        }
 
         if (debug) System.err.printf("[DEBUG] Connecting to sequencer at %s:%d\n", sequencerHost, sequencerPort);
 
@@ -85,7 +112,7 @@ public class NodeMain {
             }));
             server.awaitTermination();
         } catch (Exception e) {
-            System.err.println("Erro fatal: " + e.getMessage());
+            System.err.println("Fatal error: " + e.getMessage());
             if (debug) {
                 System.err.println("[DEBUG] Exception stack trace:");
                 e.printStackTrace(System.err);

@@ -40,14 +40,6 @@ public class NodeState {
 
         walletOwners.put(walletId, userId);
         walletBalances.put(walletId, 0L);
-
-        Transaction tx = Transaction.newBuilder()
-                        .setCreateWallet(CreateWalletRequest.newBuilder()
-                        .setUserId(userId)
-                        .setWalletId(walletId)
-                        .build())
-                        .build();
-        transactionLedger.add(tx);
     }
 
     public synchronized void deleteWallet(String userId, String walletId) {
@@ -67,14 +59,6 @@ public class NodeState {
 
         walletOwners.remove(walletId);
         walletBalances.remove(walletId);
-
-        Transaction tx = Transaction.newBuilder()
-                        .setDeleteWallet(DeleteWalletRequest.newBuilder()
-                        .setUserId(userId)
-                        .setWalletId(walletId)
-                        .build())
-                        .build();
-        transactionLedger.add(tx);
     }
 
     public synchronized void transfer(String srcUserId, String srcWalletId, String dstWalletId, long amount) {
@@ -103,21 +87,12 @@ public class NodeState {
         walletBalances.put(srcWalletId, walletBalances.get(srcWalletId) - amount);
         walletBalances.put(dstWalletId, walletBalances.get(dstWalletId) + amount);
 
-        // Record the transaction in the ledger
-        Transaction tx = Transaction.newBuilder()
-                        .setTransfer(TransferRequest.newBuilder()
-                        .setSrcUserId(srcUserId)
-                        .setSrcWalletId(srcWalletId)
-                        .setDstWalletId(dstWalletId)
-                        .setValue(amount)
-                        .build())
-                        .build();
-        transactionLedger.add(tx);
-
     }
 
     // Execute a transaction already ordered by the sequencer.
     public synchronized void executeTransaction(Transaction transaction) {
+        // Always add to ledger 
+        transactionLedger.add(transaction);
         switch (transaction.getOperationCase()) {
             case CREATE_WALLET:
                 CreateWalletRequest cw = transaction.getCreateWallet();
