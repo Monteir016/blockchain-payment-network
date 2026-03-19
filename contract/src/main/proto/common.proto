@@ -38,5 +38,4 @@ message Transaction {
 message Block {
   int32 block_id = 1;
   repeated Transaction transactions = 2;
-  int64 timestamp_ms = 3;
 }

@@ -220,20 +220,18 @@ public class CommandProcessor {
         Integer nodeIndex = Integer.parseInt(split[2]);
         Integer nodeDelay = Integer.parseInt(split[3]);
 
-        if (debug) System.err.printf("[DEBUG] Sending ReadBalance starting at node %d: walletId=%s, delay=%d, blocking=%b, cmd=%d\n", nodeIndex, walletId, nodeDelay, isBlocking, commandNumber);
+        if (debug) System.err.printf("[DEBUG] Sending ReadBalance starting at node %d: walletId=%s, delay=%d\n", nodeIndex, walletId, nodeDelay);
         try {
             long balance = executeWithFailover(nodeIndex, "ReadBalance",
-                    node -> node.readBalance(walletId, nodeDelay, isBlocking, commandNumber));
-            if (isBlocking) {
-                if (debug) System.err.printf("[DEBUG] Received ReadBalance response for cmd=%d: balance=%d\n", commandNumber, balance);
-                System.out.println("OK " + commandNumber);
-                System.out.println(balance);
-            }
+                    node -> node.readBalance(walletId, nodeDelay));
+            if (debug) System.err.printf("[DEBUG] Received ReadBalance response: balance=%d\n", balance);
+            System.out.println("OK " + commandNumber);
+            System.out.println(balance);
         } catch (StatusRuntimeException e) {
-            if (debug) System.err.printf("[DEBUG] ReadBalance gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
+            if (debug) System.err.printf("[DEBUG] ReadBalance gRPC error: %s\n", e.getStatus());
             printCommandError(e, nodeIndex);
         } catch (Exception e) {
-            System.err.println("All known nodes failed for command " + commandNumber);
+            System.err.println("All known nodes failed for balance command");
             if (debug) {
                 System.err.println("[DEBUG] Exception stack trace:");
                 e.printStackTrace(System.err);

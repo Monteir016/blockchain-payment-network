@@ -70,7 +70,6 @@ public class SequencerState {
         final Block closedBlock = Block.newBuilder()
             .setBlockId(blockId)
             .addAllTransactions(openBlockTransactions)
-            .setTimestampMs(System.currentTimeMillis())
             .build();
         blocks.add(closedBlock);
         // Wake up any nodes waiting for the next block.
