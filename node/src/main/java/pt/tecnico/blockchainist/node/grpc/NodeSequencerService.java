@@ -7,8 +7,16 @@ import io.grpc.StatusRuntimeException;
 
 import pt.tecnico.blockchainist.contract.*;
 
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+
 /** gRPC client for communicating with the sequencer service. */
 public class NodeSequencerService {
+    /**
+     * For bootstrap/safety checks: keep the call short so we can detect
+     * "block not yet closed" without blocking the whole node startup.
+     */
+    private static final long TRY_DELIVER_BLOCK_DEADLINE_MS = 100;
 
     private final ManagedChannel channel;
     private final SequencerServiceGrpc.SequencerServiceBlockingStub stub;
@@ -55,30 +63,44 @@ public class NodeSequencerService {
      *         distinguish "not ready" from "sequencer down" should inspect the
      *         thrown exception's status code
      */
-    public java.util.Optional<DeliverBlockResponse> tryDeliverBlock(int blockId) {
+    public Optional<DeliverBlockResponse> tryDeliverBlock(int blockId) {
         DeliverBlockRequest request = DeliverBlockRequest.newBuilder()
                 .setBlockId(blockId)
                 .build();
         try {
-            DeliverBlockResponse response = stub.deliverBlock(request);
-            // Some sequencer implementations signal unavailability via the
-            // available flag rather than by throwing.
-            if (!response.getAvailable()) {
-                return java.util.Optional.empty();
-            }
-            return java.util.Optional.of(response);
+            DeliverBlockResponse response = stub
+                    .withDeadlineAfter(TRY_DELIVER_BLOCK_DEADLINE_MS, TimeUnit.MILLISECONDS)
+                    .deliverBlock(request);
+            return response.getAvailable() ? Optional.of(response) : Optional.empty();
         } catch (StatusRuntimeException e) {
             Status.Code code = e.getStatus().getCode();
+            if (code == Status.Code.DEADLINE_EXCEEDED) {
+                // deliverBlock is blocking on the server side; treat deadline as "not ready yet".
+                return Optional.empty();
+            }
             if (code == Status.Code.NOT_FOUND
                     || code == Status.Code.OUT_OF_RANGE
                     || code == Status.Code.INVALID_ARGUMENT) {
-                // Block not yet closed — expected stop condition during polling/bootstrap
-                return java.util.Optional.empty();
+                // Defensive fallback for other "not ready" signals.
+                return Optional.empty();
             }
-            // Any other error (UNAVAILABLE, INTERNAL, …) is re-thrown so callers
-            // can decide whether to retry or abort.
             throw e;
         }
+    }
+
+    /**
+     * Blocks until the requested block is available in the sequencer.
+     * Used by the node's application pipeline to avoid tight polling.
+     */
+    public Block deliverBlockBlocking(int blockId) {
+        DeliverBlockRequest request = DeliverBlockRequest.newBuilder()
+                .setBlockId(blockId)
+                .build();
+        DeliverBlockResponse response = stub.deliverBlock(request);
+        if (!response.getAvailable()) {
+            throw new IllegalStateException("Expected block " + blockId + " to be available");
+        }
+        return response.getBlock();
     }
 
     public void shutdown() {
