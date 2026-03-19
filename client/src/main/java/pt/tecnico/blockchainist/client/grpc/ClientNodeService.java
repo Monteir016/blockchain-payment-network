@@ -9,8 +9,10 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 
+
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 
 
@@ -25,6 +27,40 @@ public class ClientNodeService {
     private static final String DELAY_HEADER_NAME = "delay-seconds";
     private static final Metadata.Key<String> DELAY_HEADER_KEY =
             Metadata.Key.of(DELAY_HEADER_NAME, Metadata.ASCII_STRING_MARSHALLER);
+
+    /**
+     * Executes the given action. If a UNAVAILABLE error is caught, recreates the channel and retries once.
+     * If it fails again, the exception is propagated.
+     */
+    public <T> T withReconnectOnUnavailable(Supplier<T> action) {
+        try {
+            return action.get();
+        } catch (StatusRuntimeException e) {
+            if (isUnavailable(e)) {
+                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
+                createChannelAndStubs();
+                return action.get();
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Void version for methods that do not return a value.
+     */
+    public void withReconnectOnUnavailableVoid(Runnable action) {
+        try {
+            action.run();
+        } catch (StatusRuntimeException e) {
+            if (isUnavailable(e)) {
+                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
+                createChannelAndStubs();
+                action.run();
+            } else {
+                throw e;
+            }
+        }
+    }
 
     private ManagedChannel channel;
     private NodeServiceGrpc.NodeServiceBlockingStub blockingStub;
@@ -77,32 +113,20 @@ public class ClientNodeService {
 
     public void createWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber, String requestId) {
         CreateWalletRequest request = CreateWalletRequest.newBuilder()
-                                        .setUserId(userId)
-                                        .setWalletId(walletId)
-                                        .setRequestId(requestId)
-                                        .build();
-        try {
-            if (isBlocking) {
+                .setUserId(userId)
+                .setWalletId(walletId)
+                .setRequestId(requestId)
+                .build();
+        if (isBlocking) {
+            withReconnectOnUnavailableVoid(() -> {
                 NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
                 stubWithHeaders.createWallet(request);
-            } else {
+            });
+        } else {
+            withReconnectOnUnavailableVoid(() -> {
                 NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
                 stubWithHeaders.createWallet(request, new ClientNodeObserver<CreateWalletResponse>(commandNumber, debug));
-            }
-        } catch (StatusRuntimeException e) {
-            if (isUnavailable(e)) {
-                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
-                createChannelAndStubs();
-                if (isBlocking) {
-                    NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
-                    stubWithHeaders.createWallet(request);
-                } else {
-                    NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-                    stubWithHeaders.createWallet(request, new ClientNodeObserver<CreateWalletResponse>(commandNumber, debug));
-                }
-            } else {
-                throw e;
-            }
+            });
         }
     }
 
@@ -118,49 +142,28 @@ public class ClientNodeService {
                 .setWalletId(walletId)
                 .setRequestId(requestId)
                 .build();
-        try {
+        withReconnectOnUnavailableVoid(() -> {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
             stubWithHeaders.createWallet(request, observer);
-        } catch (StatusRuntimeException e) {
-            if (isUnavailable(e)) {
-                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
-                createChannelAndStubs();
-                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-                stubWithHeaders.createWallet(request, observer);
-            } else {
-                throw e;
-            }
-        }
+        });
     }
 
     public void deleteWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber, String requestId) {
         DeleteWalletRequest request = DeleteWalletRequest.newBuilder()
-                                        .setUserId(userId)
-                                        .setWalletId(walletId)
-                                        .setRequestId(requestId)
-                                        .build();
-        try {
-            if (isBlocking) {
+                .setUserId(userId)
+                .setWalletId(walletId)
+                .setRequestId(requestId)
+                .build();
+        if (isBlocking) {
+            withReconnectOnUnavailableVoid(() -> {
                 NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
                 stubWithHeaders.deleteWallet(request);
-            } else {
+            });
+        } else {
+            withReconnectOnUnavailableVoid(() -> {
                 NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
                 stubWithHeaders.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber, debug));
-            }
-        } catch (StatusRuntimeException e) {
-            if (isUnavailable(e)) {
-                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
-                createChannelAndStubs();
-                if (isBlocking) {
-                    NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
-                    stubWithHeaders.deleteWallet(request);
-                } else {
-                    NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-                    stubWithHeaders.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber, debug));
-                }
-            } else {
-                throw e;
-            }
+            });
         }
     }
 
@@ -176,19 +179,10 @@ public class ClientNodeService {
                 .setWalletId(walletId)
                 .setRequestId(requestId)
                 .build();
-        try {
+        withReconnectOnUnavailableVoid(() -> {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
             stubWithHeaders.deleteWallet(request, observer);
-        } catch (StatusRuntimeException e) {
-            if (isUnavailable(e)) {
-                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
-                createChannelAndStubs();
-                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-                stubWithHeaders.deleteWallet(request, observer);
-            } else {
-                throw e;
-            }
-        }
+        });
     }
 
     public void transfer(
@@ -201,34 +195,22 @@ public class ClientNodeService {
             long commandNumber,
             String requestId) {
         TransferRequest request = TransferRequest.newBuilder()
-                                                .setSrcUserId(srcUserId)
-                                                .setSrcWalletId(srcWalletId)
-                                                .setDstWalletId(dstWalletId)
-                                                .setValue(value)
-                                                .setRequestId(requestId)
-                                                .build();
-        try {
-            if (isBlocking) {
+                .setSrcUserId(srcUserId)
+                .setSrcWalletId(srcWalletId)
+                .setDstWalletId(dstWalletId)
+                .setValue(value)
+                .setRequestId(requestId)
+                .build();
+        if (isBlocking) {
+            withReconnectOnUnavailableVoid(() -> {
                 NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
                 stubWithHeaders.transfer(request);
-            } else {
+            });
+        } else {
+            withReconnectOnUnavailableVoid(() -> {
                 NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
                 stubWithHeaders.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber, debug));
-            }
-        } catch (StatusRuntimeException e) {
-            if (isUnavailable(e)) {
-                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
-                createChannelAndStubs();
-                if (isBlocking) {
-                    NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
-                    stubWithHeaders.transfer(request);
-                } else {
-                    NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-                    stubWithHeaders.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber, debug));
-                }
-            } else {
-                throw e;
-            }
+            });
         }
     }
 
@@ -248,73 +230,34 @@ public class ClientNodeService {
                 .setValue(value)
                 .setRequestId(requestId)
                 .build();
-        try {
+        withReconnectOnUnavailableVoid(() -> {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
             stubWithHeaders.transfer(request, observer);
-        } catch (StatusRuntimeException e) {
-            if (isUnavailable(e)) {
-                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
-                createChannelAndStubs();
-                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-                stubWithHeaders.transfer(request, observer);
-            } else {
-                throw e;
-            }
-        }
+        });
     }
 
-    public long readBalance(String walletId, int delaySeconds, boolean isBlocking, long commandNumber) {
+    /**
+     * Reads the balance of a wallet. This operation is always blocking, as it is an immediate debug read and does not enter the sequencer as a transaction.
+     */
+    public long readBalance(String walletId, int delaySeconds) {
         ReadBalanceRequest request = ReadBalanceRequest.newBuilder()
-                                                        .setWalletId(walletId)
-                                                        .build();
-        try {
-            if (isBlocking) {
-                NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
-                ReadBalanceResponse response = stubWithHeaders.readBalance(request);
-                return response.getBalance();
-            } else {
-                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-                stubWithHeaders.readBalance(request, new ClientNodeObserver<pt.tecnico.blockchainist.contract.ReadBalanceResponse>(commandNumber, debug));
-            }
-        } catch (StatusRuntimeException e) {
-            if (isUnavailable(e)) {
-                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
-                createChannelAndStubs();
-                if (isBlocking) {
-                    NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
-                    ReadBalanceResponse response = stubWithHeaders.readBalance(request);
-                    return response.getBalance();
-                } else {
-                    NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-                    stubWithHeaders.readBalance(request, new ClientNodeObserver<pt.tecnico.blockchainist.contract.ReadBalanceResponse>(commandNumber, debug));
-                }
-            } else {
-                throw e;
-            }
-        }
-        return 0;
+                .setWalletId(walletId)
+                .build();
+        return withReconnectOnUnavailable(() -> {
+            NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+            ReadBalanceResponse response = stubWithHeaders.readBalance(request);
+            return response.getBalance();
+        });
     }
 
     public List<Transaction> getBlockchainState() {
-        
         GetBlockchainStateRequest request = GetBlockchainStateRequest.newBuilder().build();
-        try {
+        return withReconnectOnUnavailable(() -> {
             GetBlockchainStateResponse response = blockingStub
                     .withDeadlineAfter(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                     .getBlockchainState(request);
             return response.getTransactionsList();
-        } catch (StatusRuntimeException e) {
-            if (isUnavailable(e)) {
-                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
-                createChannelAndStubs();
-                GetBlockchainStateResponse response = blockingStub
-                        .withDeadlineAfter(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                        .getBlockchainState(request);
-                return response.getTransactionsList();
-            } else {
-                throw e;
-            }
-        }
+        });
     }
 
     public void shutdown() {
