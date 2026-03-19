@@ -38,9 +38,11 @@ public class CommandProcessor {
 
     private final AtomicLong commandCounter = new AtomicLong(0);
     private final ArrayList<ClientNodeService> nodes;
+    private final String clientId;
 
-    public CommandProcessor(ArrayList<ClientNodeService> nodes) {
+    public CommandProcessor(ArrayList<ClientNodeService> nodes, String clientId) {
         this.nodes = nodes;
+        this.clientId = clientId;
     }
 
     @FunctionalInterface
@@ -131,6 +133,7 @@ public class CommandProcessor {
         this.checkCreateCommandArgs(split);
 
         Long commandNumber = this.commandCounter.incrementAndGet();
+        String requestId = this.clientId + ":" + commandNumber;
 
         String userId = split[1];
         String walletId = split[2];
@@ -141,13 +144,13 @@ public class CommandProcessor {
         try {
             if (isBlocking) {
                 executeWithFailover(nodeIndex, "CreateWallet", node ->
-                        { node.createWallet(userId, walletId, nodeDelay, true, commandNumber); return null; });
+                        { node.createWallet(userId, walletId, nodeDelay, true, commandNumber, requestId); return null; });
             } else {
                 this.<CreateWalletResponse>executeAsyncWithFailover(
                         nodeIndex,
                         "CreateWallet",
                         commandNumber,
-                        (node, observer) -> node.createWalletAsync(userId, walletId, nodeDelay, observer)
+                        (node, observer) -> node.createWalletAsync(userId, walletId, nodeDelay, commandNumber, requestId, observer)
                 );
             }
             if (isBlocking) {
@@ -171,6 +174,7 @@ public class CommandProcessor {
         this.checkDeleteCommandArgs(split);
 
         Long commandNumber = this.commandCounter.incrementAndGet();
+        String requestId = this.clientId + ":" + commandNumber;
 
         String userId = split[1];
         String walletId = split[2];
@@ -181,13 +185,13 @@ public class CommandProcessor {
         try {
             if (isBlocking) {
                 executeWithFailover(nodeIndex, "DeleteWallet", node ->
-                        { node.deleteWallet(userId, walletId, nodeDelay, true, commandNumber); return null; });
+                        { node.deleteWallet(userId, walletId, nodeDelay, true, commandNumber, requestId); return null; });
             } else {
                 this.<DeleteWalletResponse>executeAsyncWithFailover(
                         nodeIndex,
                         "DeleteWallet",
                         commandNumber,
-                        (node, observer) -> node.deleteWalletAsync(userId, walletId, nodeDelay, observer)
+                        (node, observer) -> node.deleteWalletAsync(userId, walletId, nodeDelay, commandNumber, requestId, observer)
                 );
             }
             if (isBlocking) {
@@ -241,6 +245,7 @@ public class CommandProcessor {
         this.checkTransferCommandArgs(split);
 
         Long commandNumber = this.commandCounter.incrementAndGet();
+        String requestId = this.clientId + ":" + commandNumber;
 
         String sourceUserId = split[1];
         String sourceWalletId = split[2];
@@ -253,13 +258,13 @@ public class CommandProcessor {
         try {
             if (isBlocking) {
                 executeWithFailover(nodeIndex, "Transfer", node ->
-                        { node.transfer(sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, true, commandNumber); return null; });
+                        { node.transfer(sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, true, commandNumber, requestId); return null; });
             } else {
                 this.<TransferResponse>executeAsyncWithFailover(
                         nodeIndex,
                         "Transfer",
                         commandNumber,
-                        (node, observer) -> node.transferAsync(sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, observer)
+                        (node, observer) -> node.transferAsync(sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, commandNumber, requestId, observer)
                 );
             }
             if (isBlocking) {
