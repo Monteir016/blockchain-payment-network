@@ -44,6 +44,14 @@ public class NodeState {
         }
     }
 
+    private static String normalizeErrorMessage(String msg) {
+        // Ensure deterministic and non-null gRPC error descriptions for retries/duplicates.
+        if (msg == null || msg.isBlank()) {
+            return "Invalid request";
+        }
+        return msg;
+    }
+
 
     public NodeState() {
         // Pre-existing central bank wallet with initial balance of 1000
@@ -137,7 +145,7 @@ public class NodeState {
             if (known.success) {
                 return;
             }
-            throw new IllegalArgumentException(known.errorMessage);
+            throw new IllegalArgumentException(normalizeErrorMessage(known.errorMessage));
         }
 
         // First time we see this requestId: execute and remember the outcome.
@@ -145,7 +153,10 @@ public class NodeState {
             executeWithoutIdempotency(transaction);
             outcomesByRequestId.put(requestId, new ExecutionOutcome(true, null));
         } catch (IllegalArgumentException e) {
-            outcomesByRequestId.put(requestId, new ExecutionOutcome(false, e.getMessage()));
+            outcomesByRequestId.put(
+                    requestId,
+                    new ExecutionOutcome(false, normalizeErrorMessage(e.getMessage()))
+            );
             throw e;
         }
     }
