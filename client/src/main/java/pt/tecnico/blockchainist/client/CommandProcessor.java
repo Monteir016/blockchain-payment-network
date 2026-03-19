@@ -8,10 +8,14 @@ import java.util.regex.Pattern;
 
 import pt.tecnico.blockchainist.client.grpc.ClientNodeService;
 import pt.tecnico.blockchainist.contract.Transaction;
+import pt.tecnico.blockchainist.contract.CreateWalletResponse;
+import pt.tecnico.blockchainist.contract.DeleteWalletResponse;
+import pt.tecnico.blockchainist.contract.TransferResponse;
 
 
 import io.grpc.StatusRuntimeException;
 import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
 
 /** Reads user commands from stdin, dispatches gRPC calls, and prints results. */
 public class CommandProcessor {
@@ -42,6 +46,11 @@ public class CommandProcessor {
     @FunctionalInterface
     private interface NodeOperation<T> {
         T run(ClientNodeService node) throws Exception;
+    }
+
+    @FunctionalInterface
+    private interface AsyncNodeOperation<R> {
+        void run(ClientNodeService node, StreamObserver<R> observer) throws Exception;
     }
 
     void userInputLoop() {
@@ -130,8 +139,17 @@ public class CommandProcessor {
 
         if (debug) System.err.printf("[DEBUG] Sending CreateWallet starting at node %d: userId=%s, walletId=%s, delay=%d, blocking=%b, cmd=%d\n", nodeIndex, userId, walletId, nodeDelay, isBlocking, commandNumber);
         try {
-            executeWithFailover(nodeIndex, "CreateWallet", node ->
-                    { node.createWallet(userId, walletId, nodeDelay, isBlocking, commandNumber); return null; });
+            if (isBlocking) {
+                executeWithFailover(nodeIndex, "CreateWallet", node ->
+                        { node.createWallet(userId, walletId, nodeDelay, true, commandNumber); return null; });
+            } else {
+                this.<CreateWalletResponse>executeAsyncWithFailover(
+                        nodeIndex,
+                        "CreateWallet",
+                        commandNumber,
+                        (node, observer) -> node.createWalletAsync(userId, walletId, nodeDelay, observer)
+                );
+            }
             if (isBlocking) {
                 if (debug) System.err.printf("[DEBUG] Received CreateWallet response for cmd=%d\n", commandNumber);
                 System.out.println("OK " + commandNumber);
@@ -161,8 +179,17 @@ public class CommandProcessor {
 
         if (debug) System.err.printf("[DEBUG] Sending DeleteWallet starting at node %d: userId=%s, walletId=%s, delay=%d, blocking=%b, cmd=%d\n", nodeIndex, userId, walletId, nodeDelay, isBlocking, commandNumber);
         try {
-            executeWithFailover(nodeIndex, "DeleteWallet", node ->
-                    { node.deleteWallet(userId, walletId, nodeDelay, isBlocking, commandNumber); return null; });
+            if (isBlocking) {
+                executeWithFailover(nodeIndex, "DeleteWallet", node ->
+                        { node.deleteWallet(userId, walletId, nodeDelay, true, commandNumber); return null; });
+            } else {
+                this.<DeleteWalletResponse>executeAsyncWithFailover(
+                        nodeIndex,
+                        "DeleteWallet",
+                        commandNumber,
+                        (node, observer) -> node.deleteWalletAsync(userId, walletId, nodeDelay, observer)
+                );
+            }
             if (isBlocking) {
                 if (debug) System.err.printf("[DEBUG] Received DeleteWallet response for cmd=%d\n", commandNumber);
                 System.out.println("OK " + commandNumber);
@@ -224,8 +251,17 @@ public class CommandProcessor {
 
         if (debug) System.err.printf("[DEBUG] Sending Transfer starting at node %d: srcUserId=%s, srcWalletId=%s, dstWalletId=%s, amount=%d, delay=%d, blocking=%b, cmd=%d\n", nodeIndex, sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, isBlocking, commandNumber);
         try {
-            executeWithFailover(nodeIndex, "Transfer", node ->
-                    { node.transfer(sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, isBlocking, commandNumber); return null; });
+            if (isBlocking) {
+                executeWithFailover(nodeIndex, "Transfer", node ->
+                        { node.transfer(sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, true, commandNumber); return null; });
+            } else {
+                this.<TransferResponse>executeAsyncWithFailover(
+                        nodeIndex,
+                        "Transfer",
+                        commandNumber,
+                        (node, observer) -> node.transferAsync(sourceUserId, sourceWalletId, destinationWalletId, amount, nodeDelay, observer)
+                );
+            }
             if (isBlocking) {
                 if (debug) System.err.printf("[DEBUG] Received Transfer response for cmd=%d\n", commandNumber);
                 System.out.println("OK " + commandNumber);
@@ -507,5 +543,85 @@ public class CommandProcessor {
 
         throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription(
                 String.format("No nodes configured for %s", operationName)));
+    }
+
+    private <R> void executeAsyncWithFailover(
+            int initialNodeIndex,
+            String operationName,
+            long commandNumber,
+            AsyncNodeOperation<R> operation) throws Exception {
+        attemptAsync(initialNodeIndex, 0, operationName, commandNumber, operation);
+    }
+
+    private <R> void attemptAsync(
+            int initialNodeIndex,
+            int attempt,
+            String operationName,
+            long commandNumber,
+            AsyncNodeOperation<R> operation) throws Exception {
+        if (attempt >= this.nodes.size()) {
+            System.err.printf("All known nodes failed while executing %s (starting at node %d)%n",
+                    operationName, initialNodeIndex);
+            return;
+        }
+
+        int currentIndex = (initialNodeIndex + attempt) % this.nodes.size();
+        ClientNodeService node = this.nodes.get(currentIndex);
+
+        if (debug && attempt > 0) {
+            System.err.printf("[DEBUG] Async retry %s on node %d (attempt %d/%d) for cmd=%d%n",
+                    operationName, currentIndex, attempt + 1, this.nodes.size(), commandNumber);
+        }
+
+        operation.run(node, new StreamObserver<R>() {
+            @Override
+            public void onNext(R value) {
+                System.out.println("OK " + commandNumber);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                if (t instanceof StatusRuntimeException) {
+                    StatusRuntimeException sre = (StatusRuntimeException) t;
+                    if (isRetryable(sre)) {
+                        try {
+                            attemptAsync(initialNodeIndex, attempt + 1, operationName, commandNumber, operation);
+                        } catch (Exception ex) {
+                            System.err.printf("All known nodes failed while executing %s (starting at node %d)%n",
+                                    operationName, initialNodeIndex);
+                            if (debug) {
+                                System.err.println("[DEBUG] Exception stack trace:");
+                                ex.printStackTrace(System.err);
+                            }
+                        }
+                        return;
+                    }
+
+                    String description = sre.getStatus().getDescription();
+                    if (description != null && !description.isBlank()) {
+                        System.err.println(description);
+                    } else {
+                        System.err.println(sre.getStatus());
+                    }
+                    return;
+                }
+
+                try {
+                    attemptAsync(initialNodeIndex, attempt + 1, operationName, commandNumber, operation);
+                } catch (Exception ex) {
+                    System.err.printf("All known nodes failed while executing %s (starting at node %d)%n",
+                            operationName, initialNodeIndex);
+                    if (debug) {
+                        System.err.println("[DEBUG] Exception stack trace:");
+                        ex.printStackTrace(System.err);
+                    }
+                }
+            }
+
+            @Override
+            public void onCompleted() {
+                // No operation done
+            }
+        });
     }
 }
