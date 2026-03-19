@@ -7,6 +7,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
+import io.grpc.stub.StreamObserver;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -104,6 +105,26 @@ public class ClientNodeService {
         }
     }
 
+    public void createWalletAsync(String userId, String walletId, int delaySeconds, StreamObserver<CreateWalletResponse> observer) {
+        CreateWalletRequest request = CreateWalletRequest.newBuilder()
+                .setUserId(userId)
+                .setWalletId(walletId)
+                .build();
+        try {
+            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+            stubWithHeaders.createWallet(request, observer);
+        } catch (StatusRuntimeException e) {
+            if (isUnavailable(e)) {
+                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
+                createChannelAndStubs();
+                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+                stubWithHeaders.createWallet(request, observer);
+            } else {
+                throw e;
+            }
+        }
+    }
+
     public void deleteWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber) {
         DeleteWalletRequest request = DeleteWalletRequest.newBuilder()
                                         .setUserId(userId)
@@ -128,6 +149,26 @@ public class ClientNodeService {
                     NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
                     stubWithHeaders.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber, debug));
                 }
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    public void deleteWalletAsync(String userId, String walletId, int delaySeconds, StreamObserver<DeleteWalletResponse> observer) {
+        DeleteWalletRequest request = DeleteWalletRequest.newBuilder()
+                .setUserId(userId)
+                .setWalletId(walletId)
+                .build();
+        try {
+            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+            stubWithHeaders.deleteWallet(request, observer);
+        } catch (StatusRuntimeException e) {
+            if (isUnavailable(e)) {
+                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
+                createChannelAndStubs();
+                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+                stubWithHeaders.deleteWallet(request, observer);
             } else {
                 throw e;
             }
@@ -160,6 +201,28 @@ public class ClientNodeService {
                     NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
                     stubWithHeaders.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber, debug));
                 }
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    public void transferAsync(String srcUserId, String srcWalletId, String dstWalletId, long value, int delaySeconds, StreamObserver<TransferResponse> observer) {
+        TransferRequest request = TransferRequest.newBuilder()
+                .setSrcUserId(srcUserId)
+                .setSrcWalletId(srcWalletId)
+                .setDstWalletId(dstWalletId)
+                .setValue(value)
+                .build();
+        try {
+            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+            stubWithHeaders.transfer(request, observer);
+        } catch (StatusRuntimeException e) {
+            if (isUnavailable(e)) {
+                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
+                createChannelAndStubs();
+                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+                stubWithHeaders.transfer(request, observer);
             } else {
                 throw e;
             }
