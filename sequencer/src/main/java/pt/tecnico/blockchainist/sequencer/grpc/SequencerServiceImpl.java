@@ -60,7 +60,7 @@ public class SequencerServiceImpl extends SequencerServiceGrpc.SequencerServiceI
                              StreamObserver<DeliverBlockResponse> responseObserver) {
         try {
             int blockId = request.getBlockId();
-            Block block = state.getBlock(blockId);
+            Block block = state.waitForBlock(blockId);
 
             DeliverBlockResponse response = DeliverBlockResponse.newBuilder()
                     .setAvailable(true)
@@ -69,12 +69,15 @@ public class SequencerServiceImpl extends SequencerServiceGrpc.SequencerServiceI
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            responseObserver.onError(
+                    Status.CANCELLED.withDescription("Interrupted while waiting for block").asRuntimeException()
+            );
         } catch (IllegalArgumentException e) {
-            DeliverBlockResponse response = DeliverBlockResponse.newBuilder()
-                    .setAvailable(false)
-                    .build();
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException()
+            );
         }
     }
 }

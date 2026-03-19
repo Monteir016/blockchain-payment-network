@@ -73,6 +73,8 @@ public class SequencerState {
             .setTimestampMs(System.currentTimeMillis())
             .build();
         blocks.add(closedBlock);
+        // Wake up any nodes waiting for the next block.
+        notifyAll();
 
         if (debug) System.err.println("[DEBUG] [Sequencer] Closing Block " + blockId + " with " + txCount + " transactions.");
         openBlockTransactions.clear();
@@ -102,6 +104,16 @@ public class SequencerState {
                 "Invalid block ID: " + blockId +
                 "Current range: [0, " + (blocks.size() - 1) + "]"
             );
+        }
+        return blocks.get(blockId);
+    }
+
+    public synchronized Block waitForBlock(int blockId) throws InterruptedException {
+        if (blockId < 0) {
+            throw new IllegalArgumentException("Invalid block ID: " + blockId);
+        }
+        while (blockId >= blocks.size()) {
+            wait();
         }
         return blocks.get(blockId);
     }
