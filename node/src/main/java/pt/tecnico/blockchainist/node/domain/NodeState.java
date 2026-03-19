@@ -25,6 +25,25 @@ public class NodeState {
     // Transaction ledger (A.2: individual transactions; B.1+: blocks)
     private final List<Transaction> transactionLedger = new ArrayList<>();
 
+    /**
+     * - Key: requestId (stable across retries).
+     * - Value: whether the request succeeded; if it failed, store the error message.
+     *
+     * When the same requestId appears multiple times (client retry causing duplicate broadcast),
+     * we skip state mutation and return the same outcome deterministically.
+     */
+    private final HashMap<String, ExecutionOutcome> outcomesByRequestId = new HashMap<>();
+
+    private static class ExecutionOutcome {
+        private final boolean success;
+        private final String errorMessage; // non-null when success=false
+
+        private ExecutionOutcome(boolean success, String errorMessage) {
+            this.success = success;
+            this.errorMessage = errorMessage;
+        }
+    }
+
 
     public NodeState() {
         // Pre-existing central bank wallet with initial balance of 1000
@@ -89,10 +108,49 @@ public class NodeState {
 
     }
 
+    private String extractRequestId(Transaction transaction) {
+        switch (transaction.getOperationCase()) {
+            case CREATE_WALLET:
+                return transaction.getCreateWallet().getRequestId();
+            case DELETE_WALLET:
+                return transaction.getDeleteWallet().getRequestId();
+            case TRANSFER:
+                return transaction.getTransfer().getRequestId();
+            default:
+                return "";
+        }
+    }
+
     // Execute a transaction already ordered by the sequencer.
     public synchronized void executeTransaction(Transaction transaction) {
-        // Always add to ledger 
+        String requestId = extractRequestId(transaction);
+
         transactionLedger.add(transaction);
+
+        if (requestId == null || requestId.isBlank()) {
+            executeWithoutIdempotency(transaction);
+            return;
+        }
+
+        ExecutionOutcome known = outcomesByRequestId.get(requestId);
+        if (known != null) {
+            if (known.success) {
+                return;
+            }
+            throw new IllegalArgumentException(known.errorMessage);
+        }
+
+        // First time we see this requestId: execute and remember the outcome.
+        try {
+            executeWithoutIdempotency(transaction);
+            outcomesByRequestId.put(requestId, new ExecutionOutcome(true, null));
+        } catch (IllegalArgumentException e) {
+            outcomesByRequestId.put(requestId, new ExecutionOutcome(false, e.getMessage()));
+            throw e;
+        }
+    }
+
+    private void executeWithoutIdempotency(Transaction transaction) {
         switch (transaction.getOperationCase()) {
             case CREATE_WALLET:
                 CreateWalletRequest cw = transaction.getCreateWallet();

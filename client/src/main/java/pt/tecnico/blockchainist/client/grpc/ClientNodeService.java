@@ -75,10 +75,11 @@ public class ClientNodeService {
                 .withDeadlineAfter(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
-    public void createWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber) {
+    public void createWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber, String requestId) {
         CreateWalletRequest request = CreateWalletRequest.newBuilder()
                                         .setUserId(userId)
                                         .setWalletId(walletId)
+                                        .setRequestId(requestId)
                                         .build();
         try {
             if (isBlocking) {
@@ -105,10 +106,17 @@ public class ClientNodeService {
         }
     }
 
-    public void createWalletAsync(String userId, String walletId, int delaySeconds, StreamObserver<CreateWalletResponse> observer) {
+    public void createWalletAsync(
+            String userId,
+            String walletId,
+            int delaySeconds,
+            long commandNumber,
+            String requestId,
+            StreamObserver<CreateWalletResponse> observer) {
         CreateWalletRequest request = CreateWalletRequest.newBuilder()
                 .setUserId(userId)
                 .setWalletId(walletId)
+                .setRequestId(requestId)
                 .build();
         try {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
@@ -125,10 +133,11 @@ public class ClientNodeService {
         }
     }
 
-    public void deleteWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber) {
+    public void deleteWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber, String requestId) {
         DeleteWalletRequest request = DeleteWalletRequest.newBuilder()
                                         .setUserId(userId)
                                         .setWalletId(walletId)
+                                        .setRequestId(requestId)
                                         .build();
         try {
             if (isBlocking) {
@@ -155,10 +164,17 @@ public class ClientNodeService {
         }
     }
 
-    public void deleteWalletAsync(String userId, String walletId, int delaySeconds, StreamObserver<DeleteWalletResponse> observer) {
+    public void deleteWalletAsync(
+            String userId,
+            String walletId,
+            int delaySeconds,
+            long commandNumber,
+            String requestId,
+            StreamObserver<DeleteWalletResponse> observer) {
         DeleteWalletRequest request = DeleteWalletRequest.newBuilder()
                 .setUserId(userId)
                 .setWalletId(walletId)
+                .setRequestId(requestId)
                 .build();
         try {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
@@ -175,12 +191,21 @@ public class ClientNodeService {
         }
     }
 
-    public void transfer(String srcUserId, String srcWalletId, String dstWalletId, long value, int delaySeconds, boolean isBlocking, long commandNumber) {
+    public void transfer(
+            String srcUserId,
+            String srcWalletId,
+            String dstWalletId,
+            long value,
+            int delaySeconds,
+            boolean isBlocking,
+            long commandNumber,
+            String requestId) {
         TransferRequest request = TransferRequest.newBuilder()
                                                 .setSrcUserId(srcUserId)
                                                 .setSrcWalletId(srcWalletId)
                                                 .setDstWalletId(dstWalletId)
                                                 .setValue(value)
+                                                .setRequestId(requestId)
                                                 .build();
         try {
             if (isBlocking) {
@@ -207,12 +232,21 @@ public class ClientNodeService {
         }
     }
 
-    public void transferAsync(String srcUserId, String srcWalletId, String dstWalletId, long value, int delaySeconds, StreamObserver<TransferResponse> observer) {
+    public void transferAsync(
+            String srcUserId,
+            String srcWalletId,
+            String dstWalletId,
+            long value,
+            int delaySeconds,
+            long commandNumber,
+            String requestId,
+            StreamObserver<TransferResponse> observer) {
         TransferRequest request = TransferRequest.newBuilder()
                 .setSrcUserId(srcUserId)
                 .setSrcWalletId(srcWalletId)
                 .setDstWalletId(dstWalletId)
                 .setValue(value)
+                .setRequestId(requestId)
                 .build();
         try {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);

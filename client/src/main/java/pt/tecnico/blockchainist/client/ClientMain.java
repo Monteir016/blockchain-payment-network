@@ -1,6 +1,7 @@
 package pt.tecnico.blockchainist.client;
 
 import java.util.ArrayList;
+import java.util.UUID;
 
 import pt.tecnico.blockchainist.client.grpc.ClientNodeService;
 
@@ -50,9 +51,12 @@ public class ClientMain {
             nodes.add(new ClientNodeService(host, port, organization, debug));
         }
 
+        // Stable client identifier for Issue 9 (requestId = clientId + commandNumber).
+        String clientId = UUID.randomUUID().toString();
+
         try {
             if (debug) System.err.println("[DEBUG] Creating CommandProcessor");
-            CommandProcessor processor = new CommandProcessor(nodes);
+            CommandProcessor processor = new CommandProcessor(nodes, clientId);
             if (debug) System.err.println("[DEBUG] Entering user input loop");
             processor.userInputLoop();
         } catch (Exception e) {
