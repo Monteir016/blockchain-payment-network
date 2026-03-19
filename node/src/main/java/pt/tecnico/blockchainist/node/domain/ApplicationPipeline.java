@@ -1,16 +1,14 @@
 package pt.tecnico.blockchainist.node.domain;
 
 import pt.tecnico.blockchainist.contract.Block;
-import pt.tecnico.blockchainist.contract.DeliverBlockResponse;
 import pt.tecnico.blockchainist.contract.Transaction;
 import pt.tecnico.blockchainist.node.grpc.NodeSequencerService;
 
-import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Single-threaded pipeline that polls the sequencer for blocks and applies
+ * Single-threaded pipeline that blocks waiting for sequencer blocks and applies
  * transactions in total order. Write requests from clients register a
  * CompletableFuture here and are completed when the corresponding transaction
  * is applied in this thread
@@ -63,18 +61,13 @@ public class ApplicationPipeline implements Runnable {
     public void run() {
         while (running) {
             int next = nextBlockIndex.get();
-            Optional<DeliverBlockResponse> opt;
             boolean debug = Boolean.getBoolean("debug");
             try {
-                opt = sequencerService.tryDeliverBlock(next);
-            } catch (io.grpc.StatusRuntimeException e) {
-                if (debug) System.err.println("[DEBUG] [Pipeline] Sequencer unavailable: " + e.getStatus() + " retrying...");
-                sleepOrStop(POLL_MS * 20);
-                continue;
-            }
-            if (opt.isPresent()) {
-                Block block = opt.get().getBlock();
-                if (debug) System.err.printf("[DEBUG] [Pipeline] Received block %d with %d txs\n", block.getBlockId(), block.getTransactionsCount());
+                Block block = sequencerService.deliverBlockBlocking(next);
+                if (debug) {
+                    System.err.printf("[DEBUG] [Pipeline] Received block %d with %d txs\n",
+                            block.getBlockId(), block.getTransactionsCount());
+                }
                 for (Transaction tx : block.getTransactionsList()) {
                     try {
                         if (debug) System.err.printf("[DEBUG] [Pipeline] Applying tx: %s\n", tx);
@@ -87,8 +80,10 @@ public class ApplicationPipeline implements Runnable {
                     }
                 }
                 nextBlockIndex.incrementAndGet();
-            } else {
-                sleepOrStop(POLL_MS);
+            } catch (io.grpc.StatusRuntimeException e) {
+                if (debug) System.err.println("[DEBUG] [Pipeline] Sequencer unavailable: " + e.getStatus() + " retrying...");
+                sleepOrStop(POLL_MS * 20);
+                continue;
             }
         }
     }
