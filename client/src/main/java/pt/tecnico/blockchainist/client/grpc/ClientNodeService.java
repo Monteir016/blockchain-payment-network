@@ -5,6 +5,7 @@ import pt.tecnico.blockchainist.contract.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 
 import java.util.List;
@@ -22,32 +23,33 @@ public class ClientNodeService {
     private static final Metadata.Key<String> DELAY_HEADER_KEY =
             Metadata.Key.of(DELAY_HEADER_NAME, Metadata.ASCII_STRING_MARSHALLER);
 
-    private final ManagedChannel channel;
-    private final NodeServiceGrpc.NodeServiceBlockingStub blockingStub;
-    private final NodeServiceGrpc.NodeServiceStub asyncStub;
+    private ManagedChannel channel;
+    private NodeServiceGrpc.NodeServiceBlockingStub blockingStub;
+    private NodeServiceGrpc.NodeServiceStub asyncStub;
     private final boolean debug;
+    private final String host;
+    private final int port;
+    // private final String organization; // Not used, can be removed if not needed
 
     public ClientNodeService(String host, int port, String organization, boolean debug) {
         this.debug = debug;
-        // Input validation
-        if (host == null || host.isEmpty()) {
-            throw new IllegalArgumentException("Host cannot be null or empty");
-        }
+        this.host = host;
+        this.port = port;
+        // this.organization = organization; // Not used
+        createChannelAndStubs();
+    }
 
-        if (port < 0 || port > 65535) {
-            throw new IllegalArgumentException("Port number must be between 0 and 65535");
-        }
-
-        if (organization == null || organization.isEmpty()) {
-            throw new IllegalArgumentException("Organization cannot be null or empty");
-        }
-        // Channel creation
+    private void createChannelAndStubs() {
+        if (this.channel != null) this.channel.shutdown();
         this.channel = ManagedChannelBuilder.forAddress(host, port)
-                .usePlaintext() 
+                .usePlaintext()
                 .build();
-
         this.blockingStub = NodeServiceGrpc.newBlockingStub(this.channel);
         this.asyncStub = NodeServiceGrpc.newStub(this.channel);
+    }
+
+    private boolean isUnavailable(StatusRuntimeException e) {
+        return e.getStatus().getCode() == io.grpc.Status.Code.UNAVAILABLE;
     }
 
     private Metadata createDelayMetadata(int delaySeconds) {
@@ -71,12 +73,28 @@ public class ClientNodeService {
                                         .setUserId(userId)
                                         .setWalletId(walletId)
                                         .build();
-        if (isBlocking) {
-            NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
-            stubWithHeaders.createWallet(request);
-        } else {
-            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-            stubWithHeaders.createWallet(request, new ClientNodeObserver<CreateWalletResponse>(commandNumber, debug));
+        try {
+            if (isBlocking) {
+                NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+                stubWithHeaders.createWallet(request);
+            } else {
+                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+                stubWithHeaders.createWallet(request, new ClientNodeObserver<CreateWalletResponse>(commandNumber, debug));
+            }
+        } catch (StatusRuntimeException e) {
+            if (isUnavailable(e)) {
+                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
+                createChannelAndStubs();
+                if (isBlocking) {
+                    NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+                    stubWithHeaders.createWallet(request);
+                } else {
+                    NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+                    stubWithHeaders.createWallet(request, new ClientNodeObserver<CreateWalletResponse>(commandNumber, debug));
+                }
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -85,12 +103,28 @@ public class ClientNodeService {
                                         .setUserId(userId)
                                         .setWalletId(walletId)
                                         .build();
-        if (isBlocking) {
-            NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
-            stubWithHeaders.deleteWallet(request);
-        } else {
-            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-            stubWithHeaders.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber, debug));
+        try {
+            if (isBlocking) {
+                NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+                stubWithHeaders.deleteWallet(request);
+            } else {
+                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+                stubWithHeaders.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber, debug));
+            }
+        } catch (StatusRuntimeException e) {
+            if (isUnavailable(e)) {
+                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
+                createChannelAndStubs();
+                if (isBlocking) {
+                    NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+                    stubWithHeaders.deleteWallet(request);
+                } else {
+                    NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+                    stubWithHeaders.deleteWallet(request, new ClientNodeObserver<DeleteWalletResponse>(commandNumber, debug));
+                }
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -101,12 +135,28 @@ public class ClientNodeService {
                                                 .setDstWalletId(dstWalletId)
                                                 .setValue(value)
                                                 .build();
-        if (isBlocking) {
-            NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
-            stubWithHeaders.transfer(request);
-        } else {
-            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
-            stubWithHeaders.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber, debug));
+        try {
+            if (isBlocking) {
+                NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+                stubWithHeaders.transfer(request);
+            } else {
+                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+                stubWithHeaders.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber, debug));
+            }
+        } catch (StatusRuntimeException e) {
+            if (isUnavailable(e)) {
+                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
+                createChannelAndStubs();
+                if (isBlocking) {
+                    NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+                    stubWithHeaders.transfer(request);
+                } else {
+                    NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+                    stubWithHeaders.transfer(request, new ClientNodeObserver<TransferResponse>(commandNumber, debug));
+                }
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -114,13 +164,30 @@ public class ClientNodeService {
         ReadBalanceRequest request = ReadBalanceRequest.newBuilder()
                                                         .setWalletId(walletId)
                                                         .build();
-        if (isBlocking) {
-            NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
-            ReadBalanceResponse response = stubWithHeaders.readBalance(request);
-            return response.getBalance();
-        } else {
-            NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+        try {
+            if (isBlocking) {
+                NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+                ReadBalanceResponse response = stubWithHeaders.readBalance(request);
+                return response.getBalance();
+            } else {
+                NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
                 stubWithHeaders.readBalance(request, new ClientNodeObserver<pt.tecnico.blockchainist.contract.ReadBalanceResponse>(commandNumber, debug));
+            }
+        } catch (StatusRuntimeException e) {
+            if (isUnavailable(e)) {
+                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
+                createChannelAndStubs();
+                if (isBlocking) {
+                    NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
+                    ReadBalanceResponse response = stubWithHeaders.readBalance(request);
+                    return response.getBalance();
+                } else {
+                    NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
+                    stubWithHeaders.readBalance(request, new ClientNodeObserver<pt.tecnico.blockchainist.contract.ReadBalanceResponse>(commandNumber, debug));
+                }
+            } else {
+                throw e;
+            }
         }
         return 0;
     }
@@ -128,9 +195,19 @@ public class ClientNodeService {
     public List<Transaction> getBlockchainState() {
         
         GetBlockchainStateRequest request = GetBlockchainStateRequest.newBuilder().build();
-        GetBlockchainStateResponse response = blockingStub.getBlockchainState(request);
-        return response.getTransactionsList();
-    
+        try {
+            GetBlockchainStateResponse response = blockingStub.getBlockchainState(request);
+            return response.getTransactionsList();
+        } catch (StatusRuntimeException e) {
+            if (isUnavailable(e)) {
+                if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
+                createChannelAndStubs();
+                GetBlockchainStateResponse response = blockingStub.getBlockchainState(request);
+                return response.getTransactionsList();
+            } else {
+                throw e;
+            }
+        }
     }
 
     public void shutdown() {

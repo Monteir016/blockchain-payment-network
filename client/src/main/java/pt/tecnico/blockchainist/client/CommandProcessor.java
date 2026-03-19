@@ -22,6 +22,7 @@ public class CommandProcessor {
     private static final String DELETE_BLOCKING = "E";
     private static final String DELETE_ASYNC = "e";
     private static final String BALANCE_BLOCKING = "S";
+    private static final String BALANCE_SYNC = "s";
     private static final String TRANSFER_BLOCKING = "T";
     private static final String TRANSFER_ASYNC = "t";
     private static final String DEBUG_BLOCKCHAIN_STATE = "B";
@@ -71,6 +72,7 @@ public class CommandProcessor {
                         break;
 
                     case BALANCE_BLOCKING:
+                    case BALANCE_SYNC:
                         this.balance(split, true);
                         break;
 
@@ -130,7 +132,11 @@ public class CommandProcessor {
             }
         } catch (StatusRuntimeException e) {
             if (debug) System.err.printf("[DEBUG] CreateWallet gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
-            System.err.println(e.getStatus().getDescription());
+            if (e.getStatus().getCode() == io.grpc.Status.Code.UNAVAILABLE) {
+                System.err.println("Node " + nodeIndex + " is unreachable");
+            } else {
+                System.err.println(e.getStatus().getDescription());
+            }
         } catch (Exception e) {
             System.err.println("Node " + nodeIndex + " is unreachable");
             if (debug) {
@@ -161,7 +167,11 @@ public class CommandProcessor {
             }
         } catch (StatusRuntimeException e) {
             if (debug) System.err.printf("[DEBUG] DeleteWallet gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
-            System.err.println(e.getStatus().getDescription());
+            if (e.getStatus().getCode() == io.grpc.Status.Code.UNAVAILABLE) {
+                System.err.println("Node " + nodeIndex + " is unreachable");
+            } else {
+                System.err.println(e.getStatus().getDescription());
+            }
         } catch (Exception e) {
             System.err.println("Node " + nodeIndex + " is unreachable");
             if (debug) {
@@ -192,7 +202,11 @@ public class CommandProcessor {
             }
         } catch (StatusRuntimeException e) {
             if (debug) System.err.printf("[DEBUG] ReadBalance gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
-            System.err.println(e.getStatus().getDescription());
+            if (e.getStatus().getCode() == io.grpc.Status.Code.UNAVAILABLE) {
+                System.err.println("Node " + nodeIndex + " is unreachable");
+            } else {
+                System.err.println(e.getStatus().getDescription());
+            }
         } catch (Exception e) {
             System.err.println("Node " + nodeIndex + " is unreachable");
             if (debug) {
@@ -225,7 +239,11 @@ public class CommandProcessor {
             }
         } catch (StatusRuntimeException e) {
             if (debug) System.err.printf("[DEBUG] Transfer gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
-            System.err.println(e.getStatus().getDescription());
+            if (e.getStatus().getCode() == io.grpc.Status.Code.UNAVAILABLE) {
+                System.err.println("Node " + nodeIndex + " is unreachable");
+            } else {
+                System.err.println(e.getStatus().getDescription());
+            }
         } catch (Exception e) {
             System.err.println("Node " + nodeIndex + " is unreachable");
             if (debug) {
@@ -254,7 +272,11 @@ public class CommandProcessor {
             }
         } catch (StatusRuntimeException e) {
             if (debug) System.err.printf("[DEBUG] GetBlockchainState gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
-            System.err.println(e.getStatus().getDescription());
+            if (e.getStatus().getCode() == io.grpc.Status.Code.UNAVAILABLE) {
+                System.err.println("Node " + nodeIndex + " is unreachable");
+            } else {
+                System.err.println(e.getStatus().getDescription());
+            }
         } catch (Exception e) {
             System.err.println("Node " + nodeIndex + " is unreachable");
             if (debug) {
