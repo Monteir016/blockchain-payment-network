@@ -15,13 +15,6 @@ public class ClientNodeObserver<R> implements StreamObserver<R> {
     public void onNext(R response) {
         if (debug) System.err.printf("[DEBUG] Received async response for cmd=%d\n", commandNumber);
         System.out.println("OK " + commandNumber);
-        // Print extra info for ReadBalanceResponse
-        if (response instanceof pt.tecnico.blockchainist.contract.ReadBalanceResponse) {
-            long balance = ((pt.tecnico.blockchainist.contract.ReadBalanceResponse) response).getBalance();
-            if (debug) System.err.printf("[DEBUG] Balance in async response for cmd=%d: %d\n", commandNumber, balance);
-            System.out.println(balance);
-        }
-        // For other responses, nothing extra is printed (could be extended if needed)
     }
 
     @Override
