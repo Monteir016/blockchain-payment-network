@@ -9,6 +9,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 
 
@@ -19,6 +20,7 @@ import java.util.List;
  * Exceptions are propagated to the caller (CommandProcessor).
  */
 public class ClientNodeService {
+    private static final int REQUEST_TIMEOUT_SECONDS = 8;
     private static final String DELAY_HEADER_NAME = "delay-seconds";
     private static final Metadata.Key<String> DELAY_HEADER_KEY =
             Metadata.Key.of(DELAY_HEADER_NAME, Metadata.ASCII_STRING_MARSHALLER);
@@ -60,12 +62,16 @@ public class ClientNodeService {
 
     private NodeServiceGrpc.NodeServiceBlockingStub blockingStubWithDelay(int delaySeconds) {
         Metadata headers = createDelayMetadata(delaySeconds);
-        return blockingStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers));
+        return blockingStub
+                .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers))
+                .withDeadlineAfter(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
     private NodeServiceGrpc.NodeServiceStub asyncStubWithDelay(int delaySeconds) {
         Metadata headers = createDelayMetadata(delaySeconds);
-        return asyncStub.withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers));
+        return asyncStub
+                .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers))
+                .withDeadlineAfter(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
     public void createWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber) {
@@ -196,13 +202,17 @@ public class ClientNodeService {
         
         GetBlockchainStateRequest request = GetBlockchainStateRequest.newBuilder().build();
         try {
-            GetBlockchainStateResponse response = blockingStub.getBlockchainState(request);
+            GetBlockchainStateResponse response = blockingStub
+                    .withDeadlineAfter(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .getBlockchainState(request);
             return response.getTransactionsList();
         } catch (StatusRuntimeException e) {
             if (isUnavailable(e)) {
                 if (debug) System.err.println("[DEBUG] Recreating gRPC channel for node " + host + ":" + port);
                 createChannelAndStubs();
-                GetBlockchainStateResponse response = blockingStub.getBlockchainState(request);
+                GetBlockchainStateResponse response = blockingStub
+                        .withDeadlineAfter(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                        .getBlockchainState(request);
                 return response.getTransactionsList();
             } else {
                 throw e;
