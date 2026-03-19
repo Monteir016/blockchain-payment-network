@@ -22,7 +22,6 @@ public class CommandProcessor {
     private static final String DELETE_BLOCKING = "E";
     private static final String DELETE_ASYNC = "e";
     private static final String BALANCE_BLOCKING = "S";
-    private static final String BALANCE_ASYNC = "s";
     private static final String TRANSFER_BLOCKING = "T";
     private static final String TRANSFER_ASYNC = "t";
     private static final String DEBUG_BLOCKCHAIN_STATE = "B";
@@ -75,9 +74,6 @@ public class CommandProcessor {
                         this.balance(split, true);
                         break;
 
-                    case BALANCE_ASYNC:
-                        this.balance(split, false);
-                        break;
 
                     case TRANSFER_BLOCKING:
                         this.transfer(split, true);
