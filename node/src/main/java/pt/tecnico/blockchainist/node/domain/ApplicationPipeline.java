@@ -8,10 +8,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Single-threaded pipeline that blocks waiting for sequencer blocks and applies
- * transactions in total order. Write requests from clients register a
- * CompletableFuture here and are completed when the corresponding transaction
- * is applied in this thread
+ * Thread pipeline that ensures that the transactions are applied in the same order of the sequencer, and notifies the client when their request is really done
  */
 public class ApplicationPipeline implements Runnable {
 
@@ -20,8 +17,11 @@ public class ApplicationPipeline implements Runnable {
     private final NodeState nodeState;
     private final NodeSequencerService sequencerService;
     private final AtomicInteger nextBlockIndex = new AtomicInteger(0);
-    /** Pending futures per transaction (by content equality). Supports duplicate tx content. */
-    private final ConcurrentHashMap<Transaction, BlockingQueue<CompletableFuture<Void>>> pendingByTransaction = new ConcurrentHashMap<>();
+
+    // A future for each pending transaction, so we can complete it when the transaction is applied
+    private final ConcurrentHashMap<Transaction, CompletableFuture<Void>> pendingByTransaction = new ConcurrentHashMap<>();
+
+
     private volatile boolean running = true;
     private Thread workerThread;
 
@@ -30,30 +30,17 @@ public class ApplicationPipeline implements Runnable {
         this.sequencerService = sequencerService;
     }
 
-    /**
-     * Registers a future to be completed when the given transaction is applied
-     * in the pipeline. Called by the gRPC handler after broadcasting the transaction.
-     */
+    // Called by the gRPC handler after broadcasting a transaction
     public void registerPending(Transaction transaction, CompletableFuture<Void> future) {
-        pendingByTransaction
-                .computeIfAbsent(transaction, k -> new LinkedBlockingQueue<>())
-                .add(future);
+        pendingByTransaction.put(transaction, future);
     }
 
-    /**
-     * Completes the first pending future for this transaction (by content).
-     * If the application threw, the future is completed with that exception.
-     */
-    private void completeFirstPendingFor(Transaction transaction, Throwable failure) {
-        BlockingQueue<CompletableFuture<Void>> queue = pendingByTransaction.get(transaction);
-        if (queue == null) return;
-        CompletableFuture<Void> f = queue.poll();
+    // Transaction has been applied, complete the future so the client can return the response
+    private void completePendingFor(Transaction transaction, Throwable failure) {
+        CompletableFuture<Void> f = pendingByTransaction.remove(transaction);
         if (f != null) {
-            if (failure == null) {
-                f.complete(null);
-            } else {
-                f.completeExceptionally(failure);
-            }
+            if (failure == null) f.complete(null);
+            else f.completeExceptionally(failure);
         }
     }
 
@@ -73,10 +60,10 @@ public class ApplicationPipeline implements Runnable {
                         if (debug) System.err.printf("[DEBUG] [Pipeline] Applying tx: %s\n", tx);
                         nodeState.executeTransaction(tx);
                         if (debug) System.err.printf("[DEBUG] [Pipeline] Applied tx: %s\n", tx);
-                        completeFirstPendingFor(tx, null);
+                        completePendingFor(tx, null);
                     } catch (Throwable e) {
                         if (debug) System.err.printf("[DEBUG] [Pipeline] Error applying tx: %s\n", tx);
-                        completeFirstPendingFor(tx, e);
+                        completePendingFor(tx, e);
                     }
                 }
                 nextBlockIndex.incrementAndGet();
@@ -97,14 +84,14 @@ public class ApplicationPipeline implements Runnable {
         }
     }
 
-    /** Starts the dedicated application thread. */
+    // Starts the thread that runs the pipeline loop
     public void start() {
         workerThread = new Thread(this, "block-application");
         workerThread.setDaemon(false);
         workerThread.start();
     }
 
-    /** Stops the pipeline thread. */
+    // Stops the pipeline thread
     public void stop() {
         running = false;
         if (workerThread != null) {
@@ -112,7 +99,7 @@ public class ApplicationPipeline implements Runnable {
         }
     }
 
-    /** For B.2 sync: set next block index when node catches up from sequencer. */
+    // Used for sync: set the next block index when the node catches up with the sequencer
     public void setNextBlockIndex(int index) {
         nextBlockIndex.set(index);
     }
