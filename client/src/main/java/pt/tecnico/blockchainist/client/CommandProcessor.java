@@ -60,7 +60,6 @@ public class CommandProcessor {
         Scanner scanner = new Scanner(System.in);
         boolean exit = false;
 
-        // Imprime o símbolo '>' antes do primeiro comando
         System.out.print("\n> ");
 
         while (!exit && scanner.hasNextLine()) {
@@ -576,55 +575,75 @@ public class CommandProcessor {
                     operationName, currentIndex, attempt + 1, this.nodes.size(), commandNumber);
         }
 
-        operation.run(node, new StreamObserver<R>() {
-            @Override
-            public void onNext(R value) {
-                System.out.println("OK " + commandNumber);
-            }
+        operation.run(node, new RetryStreamObserver<>(
+                this, initialNodeIndex, attempt, operationName, commandNumber, operation));
+    }
 
-            @Override
-            public void onError(Throwable t) {
-                if (t instanceof StatusRuntimeException) {
-                    StatusRuntimeException sre = (StatusRuntimeException) t;
-                    if (isRetryable(sre)) {
-                        try {
-                            attemptAsync(initialNodeIndex, attempt + 1, operationName, commandNumber, operation);
-                        } catch (Exception ex) {
-                            System.err.printf("All known nodes failed while executing %s (starting at node %d)%n",
-                                    operationName, initialNodeIndex);
-                            if (debug) {
-                                System.err.println("[DEBUG] Exception stack trace:");
-                                ex.printStackTrace(System.err);
-                            }
+    // StreamObserver for async operations that retries on failure until all nodes are tried
+    private static class RetryStreamObserver<R> implements StreamObserver<R> {
+        private final CommandProcessor processor;
+        private final int initialNodeIndex;
+        private final int attempt;
+        private final String operationName;
+        private final long commandNumber;
+        private final AsyncNodeOperation<R> operation;
+
+        RetryStreamObserver(CommandProcessor processor, int initialNodeIndex, int attempt, String operationName, long commandNumber, AsyncNodeOperation<R> operation) {
+            this.processor = processor;
+            this.initialNodeIndex = initialNodeIndex;
+            this.attempt = attempt;
+            this.operationName = operationName;
+            this.commandNumber = commandNumber;
+            this.operation = operation;
+        }
+
+        @Override
+        public void onNext(R value) {
+            System.out.println("OK " + commandNumber);
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            if (t instanceof StatusRuntimeException) {
+                StatusRuntimeException sre = (StatusRuntimeException) t;
+                if (processor.isRetryable(sre)) {
+                    try {
+                        processor.attemptAsync(initialNodeIndex, attempt + 1, operationName, commandNumber, operation);
+                    } catch (Exception ex) {
+                        System.err.printf("All known nodes failed while executing %s (starting at node %d)%n",
+                                operationName, initialNodeIndex);
+                        if (processor.debug) {
+                            System.err.println("[DEBUG] Exception stack trace:");
+                            ex.printStackTrace(System.err);
                         }
-                        return;
-                    }
-
-                    String description = sre.getStatus().getDescription();
-                    if (description != null && !description.isBlank()) {
-                        System.err.println(description);
-                    } else {
-                        System.err.println(sre.getStatus());
                     }
                     return;
                 }
 
-                try {
-                    attemptAsync(initialNodeIndex, attempt + 1, operationName, commandNumber, operation);
-                } catch (Exception ex) {
-                    System.err.printf("All known nodes failed while executing %s (starting at node %d)%n",
-                            operationName, initialNodeIndex);
-                    if (debug) {
-                        System.err.println("[DEBUG] Exception stack trace:");
-                        ex.printStackTrace(System.err);
-                    }
+                String description = sre.getStatus().getDescription();
+                if (description != null && !description.isBlank()) {
+                    System.err.println(description);
+                } else {
+                    System.err.println(sre.getStatus());
                 }
+                return;
             }
 
-            @Override
-            public void onCompleted() {
-                // No operation done
+            try {
+                processor.attemptAsync(initialNodeIndex, attempt + 1, operationName, commandNumber, operation);
+            } catch (Exception ex) {
+                System.err.printf("All known nodes failed while executing %s (starting at node %d)%n",
+                        operationName, initialNodeIndex);
+                if (processor.debug) {
+                    System.err.println("[DEBUG] Exception stack trace:");
+                    ex.printStackTrace(System.err);
+                }
             }
-        });
+        }
+
+        @Override
+        public void onCompleted() {
+            // No operation done
+        }
     }
 }
