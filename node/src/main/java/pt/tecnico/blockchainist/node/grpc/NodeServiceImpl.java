@@ -120,28 +120,18 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
         try {
             applyRequestDelayIfAny();
             nodeState.isUserFromOrganization(request.getSrcUserId(), organization);
-            
+
             Transaction tx = Transaction.newBuilder()
                     .setTransfer(request)
                     .build();
 
-            CompletableFuture<Void> done = new CompletableFuture<>();
-            applicationPipeline.registerPending(tx, done);
+            nodeState.executeTransaction(tx);
 
             sequencerService.broadcast(tx);
-            done.get(PENDING_TIMEOUT_SEC, TimeUnit.SECONDS);
 
             responseObserver.onNext(TransferResponse.newBuilder().build());
             responseObserver.onCompleted();
-        } catch (TimeoutException e) {
-            responseObserver.onError(Status.DEADLINE_EXCEEDED.withDescription("Transaction not applied in time").asRuntimeException());
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof IllegalArgumentException) {
-                responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(cause.getMessage()).asRuntimeException());
-            } else {
-                responseObserver.onError(Status.INTERNAL.withDescription(cause != null ? cause.getMessage() : e.getMessage()).asRuntimeException());
-            }
+            
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             responseObserver.onError(Status.CANCELLED.withDescription("Request interrupted while waiting delay").asRuntimeException());
