@@ -95,7 +95,8 @@ public class NodeMain {
         applicationPipeline.setNextBlockIndex(syncedBlocks);
         applicationPipeline.start();
 
-        final BindableService impl = new NodeServiceImpl(nodeState, sequencerService, applicationPipeline);
+        final BindableService impl = new NodeServiceImpl(nodeState, organization,
+                                                            sequencerService, applicationPipeline);
 
         try {
             if (debug) System.err.println("[DEBUG] Starting gRPC server");

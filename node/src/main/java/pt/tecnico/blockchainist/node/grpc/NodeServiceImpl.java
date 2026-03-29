@@ -23,12 +23,14 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     private static final long PENDING_TIMEOUT_SEC = 60;
 
     private final NodeState nodeState;
+    private final String organization;
     private final NodeSequencerService sequencerService;
     private final ApplicationPipeline applicationPipeline;
 
-    public NodeServiceImpl(NodeState nodeState, NodeSequencerService sequencerService,
+    public NodeServiceImpl(NodeState nodeState, String organization, NodeSequencerService sequencerService,
                            ApplicationPipeline applicationPipeline) {
         this.nodeState = nodeState;
+        this.organization = organization;
         this.sequencerService = sequencerService;
         this.applicationPipeline = applicationPipeline;
     }
@@ -44,12 +46,14 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     public void createWallet(CreateWalletRequest request, StreamObserver<CreateWalletResponse> responseObserver) {
         try {
             applyRequestDelayIfAny();
+            nodeState.isUserFromOrganization(request.getUserId(), organization);
+
             Transaction tx = Transaction.newBuilder()
                     .setCreateWallet(request)
                     .build();
             CompletableFuture<Void> done = new CompletableFuture<>();
             applicationPipeline.registerPending(tx, done);
-
+            
             sequencerService.broadcast(tx);
             done.get(PENDING_TIMEOUT_SEC, TimeUnit.SECONDS);
 
@@ -78,6 +82,8 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     public void deleteWallet(DeleteWalletRequest request, StreamObserver<DeleteWalletResponse> responseObserver) {
         try {
             applyRequestDelayIfAny();
+            nodeState.isUserFromOrganization(request.getUserId(), organization);
+
             Transaction tx = Transaction.newBuilder()
                     .setDeleteWallet(request)
                     .build();
@@ -113,27 +119,19 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     public void transfer(TransferRequest request, StreamObserver<TransferResponse> responseObserver) {
         try {
             applyRequestDelayIfAny();
+            nodeState.isUserFromOrganization(request.getSrcUserId(), organization);
+
             Transaction tx = Transaction.newBuilder()
                     .setTransfer(request)
                     .build();
 
-            CompletableFuture<Void> done = new CompletableFuture<>();
-            applicationPipeline.registerPending(tx, done);
+            nodeState.executeTransaction(tx);
 
             sequencerService.broadcast(tx);
-            done.get(PENDING_TIMEOUT_SEC, TimeUnit.SECONDS);
 
             responseObserver.onNext(TransferResponse.newBuilder().build());
             responseObserver.onCompleted();
-        } catch (TimeoutException e) {
-            responseObserver.onError(Status.DEADLINE_EXCEEDED.withDescription("Transaction not applied in time").asRuntimeException());
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof IllegalArgumentException) {
-                responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(cause.getMessage()).asRuntimeException());
-            } else {
-                responseObserver.onError(Status.INTERNAL.withDescription(cause != null ? cause.getMessage() : e.getMessage()).asRuntimeException());
-            }
+            
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             responseObserver.onError(Status.CANCELLED.withDescription("Request interrupted while waiting delay").asRuntimeException());

@@ -21,6 +21,8 @@ public class NodeState {
     private final HashMap<String, String> walletOwners = new HashMap<>();
     // Wallet balances: walletId -> balance
     private final HashMap<String, Long> walletBalances = new HashMap<>();
+
+    private final HashMap<String, String> organizationByUser = new HashMap<>();
     
     // Transaction ledger (A.2: individual transactions; B.1+: blocks)
     private final List<Transaction> transactionLedger = new ArrayList<>();
@@ -57,6 +59,29 @@ public class NodeState {
         // Pre-existing central bank wallet with initial balance of 1000
         walletOwners.put("bc", "BC");
         walletBalances.put("bc", 1000L);
+
+        // Pre-defined user-organization list
+        organizationByUser.put("BC", "OrgA");
+
+        organizationByUser.put("Alice", "OrgA");
+        organizationByUser.put("Bob", "OrgA");
+        organizationByUser.put("Charlie", "OrgA");
+
+        organizationByUser.put("David", "OrgB");
+        organizationByUser.put("Emma", "OrgB");
+        organizationByUser.put("Fred", "OrgB");
+
+        organizationByUser.put("Ginger", "OrgC");
+        organizationByUser.put("Henry", "OrgC");
+        organizationByUser.put("Iris", "OrgC");
+
+    }
+
+    public void isUserFromOrganization(String user, String org) {
+        String userOrg = organizationByUser.get(user);
+        if (userOrg == null || !userOrg.equals(org)) {
+            throw new IllegalArgumentException("User " + user + " is not from organization " + org);
+        }
     }
 
     public synchronized void createWallet(String userId, String walletId) {
@@ -131,11 +156,12 @@ public class NodeState {
 
     // Execute a transaction already ordered by the sequencer.
     public synchronized void executeTransaction(Transaction transaction) {
+
+        boolean debug = Boolean.getBoolean("debug");
         String requestId = extractRequestId(transaction);
 
-        transactionLedger.add(transaction);
-
         if (requestId == null || requestId.isBlank()) {
+            transactionLedger.add(transaction);
             executeWithoutIdempotency(transaction);
             return;
         }
@@ -143,6 +169,9 @@ public class NodeState {
         ExecutionOutcome known = outcomesByRequestId.get(requestId);
         if (known != null) {
             if (known.success) {
+                if (debug) {
+                    System.err.printf("[DEBUG] [NodeState] Transaction %s already executed. Ignored in block application.%n", requestId);
+                }
                 return;
             }
             throw new IllegalArgumentException(normalizeErrorMessage(known.errorMessage));
@@ -151,7 +180,13 @@ public class NodeState {
         // First time we see this requestId: execute and remember the outcome.
         try {
             executeWithoutIdempotency(transaction);
+            transactionLedger.add(transaction);
             outcomesByRequestId.put(requestId, new ExecutionOutcome(true, null));
+
+            if (debug) {
+                System.err.printf("[DEBUG] [NodeState] Transaction %s applied for the first time to the state.%n", requestId);
+            }
+            
         } catch (IllegalArgumentException e) {
             outcomesByRequestId.put(
                     requestId,
