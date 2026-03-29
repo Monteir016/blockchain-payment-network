@@ -156,11 +156,12 @@ public class NodeState {
 
     // Execute a transaction already ordered by the sequencer.
     public synchronized void executeTransaction(Transaction transaction) {
+
+        boolean debug = Boolean.getBoolean("debug");
         String requestId = extractRequestId(transaction);
 
-        transactionLedger.add(transaction);
-
         if (requestId == null || requestId.isBlank()) {
+            transactionLedger.add(transaction);
             executeWithoutIdempotency(transaction);
             return;
         }
@@ -168,6 +169,9 @@ public class NodeState {
         ExecutionOutcome known = outcomesByRequestId.get(requestId);
         if (known != null) {
             if (known.success) {
+                if (debug) {
+                    System.err.printf("[DEBUG] [NodeState] Transaction %s already executed. Ignored in block application.%n", requestId);
+                }
                 return;
             }
             throw new IllegalArgumentException(normalizeErrorMessage(known.errorMessage));
@@ -176,7 +180,13 @@ public class NodeState {
         // First time we see this requestId: execute and remember the outcome.
         try {
             executeWithoutIdempotency(transaction);
+            transactionLedger.add(transaction);
             outcomesByRequestId.put(requestId, new ExecutionOutcome(true, null));
+
+            if (debug) {
+                System.err.printf("[DEBUG] [NodeState] Transaction %s applied for the first time to the state.%n", requestId);
+            }
+            
         } catch (IllegalArgumentException e) {
             outcomesByRequestId.put(
                     requestId,
