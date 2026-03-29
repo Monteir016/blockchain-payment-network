@@ -21,6 +21,8 @@ public class NodeState {
     private final HashMap<String, String> walletOwners = new HashMap<>();
     // Wallet balances: walletId -> balance
     private final HashMap<String, Long> walletBalances = new HashMap<>();
+
+    private final HashMap<String, String> organizationByUser = new HashMap<>();
     
     // Transaction ledger (A.2: individual transactions; B.1+: blocks)
     private final List<Transaction> transactionLedger = new ArrayList<>();
@@ -57,6 +59,29 @@ public class NodeState {
         // Pre-existing central bank wallet with initial balance of 1000
         walletOwners.put("bc", "BC");
         walletBalances.put("bc", 1000L);
+
+        // Pre-defined user-organization list
+        organizationByUser.put("BC", "OrgA");
+
+        organizationByUser.put("Alice", "OrgA");
+        organizationByUser.put("Bob", "OrgA");
+        organizationByUser.put("Charlie", "OrgA");
+
+        organizationByUser.put("David", "OrgB");
+        organizationByUser.put("Emma", "OrgB");
+        organizationByUser.put("Fred", "OrgB");
+
+        organizationByUser.put("Ginger", "OrgC");
+        organizationByUser.put("Henry", "OrgC");
+        organizationByUser.put("Iris", "OrgC");
+
+    }
+
+    public void isUserFromOrganization(String user, String org) {
+        String userOrg = organizationByUser.get(user);
+        if (userOrg == null || !userOrg.equals(org)) {
+            throw new IllegalArgumentException("User " + user + " is not from organization " + org);
+        }
     }
 
     public synchronized void createWallet(String userId, String walletId) {
