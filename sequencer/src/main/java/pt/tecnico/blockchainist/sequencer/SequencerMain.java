@@ -5,6 +5,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
 import pt.tecnico.blockchainist.sequencer.domain.SequencerState;
+import pt.tecnico.blockchainist.sequencer.crypto.BlockSigner;
 import pt.tecnico.blockchainist.sequencer.grpc.SequencerServiceImpl;
 
 import java.util.concurrent.Executors;
@@ -59,10 +60,11 @@ public class SequencerMain {
         }
 
         final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        final BlockSigner blockSigner = new BlockSigner();
 
         // Create domain state and gRPC service implementation
         final SequencerState state = new SequencerState(maxTransactionsPerBlock,
-                                                        blockTimeoutSeconds, scheduler);
+                                                        blockTimeoutSeconds, scheduler, blockSigner);
         final BindableService impl = new SequencerServiceImpl(state);
 
         // Start gRPC server

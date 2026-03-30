@@ -2,6 +2,7 @@ package pt.tecnico.blockchainist.sequencer.domain;
 
 import pt.tecnico.blockchainist.contract.Transaction;
 import pt.tecnico.blockchainist.contract.Block;
+import pt.tecnico.blockchainist.sequencer.crypto.BlockSigner;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,13 +28,16 @@ public class SequencerState {
 
     private final ScheduledExecutorService scheduler;
     private ScheduledFuture<?> timeoutTask = null;
+    private final BlockSigner blockSigner;
 
     public SequencerState(int maxTransactionsPerBlock,
                          int blockTimeoutSeconds,
-                         ScheduledExecutorService scheduler) {
+                         ScheduledExecutorService scheduler,
+                         BlockSigner blockSigner) {
         this.maxTransactionsPerBlock = maxTransactionsPerBlock;
         this.blockTimeoutSeconds = blockTimeoutSeconds;
         this.scheduler = scheduler;
+        this.blockSigner = blockSigner;
     }
 
     public synchronized int addTransaction(Transaction transaction) {
@@ -67,10 +71,11 @@ public class SequencerState {
 
         final int blockId = getClosedBlockCount();
         final int txCount = openBlockTransactions.size();
-        final Block closedBlock = Block.newBuilder()
+        final Block unsignedBlock = Block.newBuilder()
             .setBlockId(blockId)
             .addAllTransactions(openBlockTransactions)
             .build();
+        final Block closedBlock = blockSigner.sign(unsignedBlock);
         blocks.add(closedBlock);
         // Wake up any nodes waiting for the next block.
         notifyAll();
