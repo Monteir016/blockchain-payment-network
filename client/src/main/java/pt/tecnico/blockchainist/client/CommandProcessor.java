@@ -156,6 +156,9 @@ public class CommandProcessor {
                 if (debug) System.err.printf("[DEBUG] Received CreateWallet response for cmd=%d\n", commandNumber);
                 System.out.println("OK " + commandNumber);
             }
+        } catch (IllegalStateException e) {
+            System.err.println(e.getMessage());
+            if (debug) e.printStackTrace(System.err);
         } catch (StatusRuntimeException e) {
             if (debug) System.err.printf("[DEBUG] CreateWallet gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
             printCommandError(e, nodeIndex);
@@ -197,6 +200,9 @@ public class CommandProcessor {
                 if (debug) System.err.printf("[DEBUG] Received DeleteWallet response for cmd=%d\n", commandNumber);
                 System.out.println("OK " + commandNumber);
             }
+        } catch (IllegalStateException e) {
+            System.err.println(e.getMessage());
+            if (debug) e.printStackTrace(System.err);
         } catch (StatusRuntimeException e) {
             if (debug) System.err.printf("[DEBUG] DeleteWallet gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
             printCommandError(e, nodeIndex);
@@ -268,6 +274,9 @@ public class CommandProcessor {
                 if (debug) System.err.printf("[DEBUG] Received Transfer response for cmd=%d\n", commandNumber);
                 System.out.println("OK " + commandNumber);
             }
+        } catch (IllegalStateException e) {
+            System.err.println(e.getMessage());
+            if (debug) e.printStackTrace(System.err);
         } catch (StatusRuntimeException e) {
             if (debug) System.err.printf("[DEBUG] Transfer gRPC error for cmd=%d: %s\n", commandNumber, e.getStatus());
             printCommandError(e, nodeIndex);

@@ -8,6 +8,8 @@ import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
@@ -55,5 +57,23 @@ public final class CryptoUtils {
 		X509EncodedKeySpec spec = new X509EncodedKeySpec(encoded);
 		KeyFactory factory = KeyFactory.getInstance(RSA_ALGORITHM);
 		return factory.generatePublic(spec);
+	}
+
+	public static byte[] sign(byte[] data, PrivateKey privateKey) throws GeneralSecurityException {
+		Signature sig = Signature.getInstance(SIGNATURE_ALGORITHM);
+		sig.initSign(privateKey);
+		sig.update(data);
+		return sig.sign();
+	}
+
+	public static boolean verify(byte[] data, byte[] signatureBytes, PublicKey publicKey) throws GeneralSecurityException {
+		Signature sig = Signature.getInstance(SIGNATURE_ALGORITHM);
+		sig.initVerify(publicKey);
+		sig.update(data);
+		try {
+			return sig.verify(signatureBytes);
+		} catch (SignatureException e) {
+			return false;
+		}
 	}
 }

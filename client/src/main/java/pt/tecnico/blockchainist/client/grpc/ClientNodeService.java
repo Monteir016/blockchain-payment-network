@@ -1,6 +1,8 @@
 package pt.tecnico.blockchainist.client.grpc;
 
+import com.google.protobuf.ByteString;
 import pt.tecnico.blockchainist.contract.*;
+import pt.tecnico.blockchainist.crypto.CryptoUtils;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -10,7 +12,12 @@ import io.grpc.stub.MetadataUtils;
 import io.grpc.stub.StreamObserver;
 
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.GeneralSecurityException;
+import java.security.PrivateKey;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -68,6 +75,8 @@ public class ClientNodeService {
     private final boolean debug;
     private final String host;
     private final int port;
+    private final ConcurrentHashMap<String, PrivateKey> privateKeysByUserId = new ConcurrentHashMap<>();
+
     // private final String organization; // Not used, can be removed if not needed
 
     public ClientNodeService(String host, int port, String organization, boolean debug) {
@@ -111,12 +120,90 @@ public class ClientNodeService {
                 .withDeadlineAfter(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
+    private PrivateKey privateKeyForUser(String userId) {
+        return privateKeysByUserId.computeIfAbsent(userId, this::loadPrivateKeyForUser);
+    }
+
+    private PrivateKey loadPrivateKeyForUser(String userId) {
+        String resourceName = "/" + userId + ".priv";
+        try (InputStream in = ClientNodeService.class.getResourceAsStream(resourceName)) {
+            if (in == null) {
+                throw new IllegalStateException(
+                        "Missing private key for user '" + userId + "': add " + resourceName
+                                + " under client/src/main/resources (see genkeys.sh)");
+            }
+            return CryptoUtils.readPrivateKey(in);
+        } catch (IOException | GeneralSecurityException e) {
+            throw new IllegalStateException("Failed to load private key for user '" + userId + "'", e);
+        }
+    }
+
+    private static byte[] canonicalSignPayload(CreateWalletRequest unsigned) {
+        return unsigned.toBuilder().clearSignature().build().toByteArray();
+    }
+
+    private static byte[] canonicalSignPayload(DeleteWalletRequest unsigned) {
+        return unsigned.toBuilder().clearSignature().build().toByteArray();
+    }
+
+    private static byte[] canonicalSignPayload(TransferRequest unsigned) {
+        return unsigned.toBuilder().clearSignature().build().toByteArray();
+    }
+
+    private CreateWalletRequest signedCreateWalletRequest(String userId, String walletId, String requestId) {
+        try {
+            CreateWalletRequest unsigned = CreateWalletRequest.newBuilder()
+                    .setUserId(userId)
+                    .setWalletId(walletId)
+                    .setRequestId(requestId)
+                    .clearSignature()
+                    .build();
+            byte[] sig = CryptoUtils.sign(canonicalSignPayload(unsigned), privateKeyForUser(userId));
+            return unsigned.toBuilder().setSignature(ByteString.copyFrom(sig)).build();
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Failed to sign CreateWalletRequest", e);
+        }
+    }
+
+    private DeleteWalletRequest signedDeleteWalletRequest(String userId, String walletId, String requestId) {
+        try {
+            DeleteWalletRequest unsigned = DeleteWalletRequest.newBuilder()
+                    .setUserId(userId)
+                    .setWalletId(walletId)
+                    .setRequestId(requestId)
+                    .clearSignature()
+                    .build();
+            byte[] sig = CryptoUtils.sign(canonicalSignPayload(unsigned), privateKeyForUser(userId));
+            return unsigned.toBuilder().setSignature(ByteString.copyFrom(sig)).build();
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Failed to sign DeleteWalletRequest", e);
+        }
+    }
+
+    private TransferRequest signedTransferRequest(
+            String srcUserId,
+            String srcWalletId,
+            String dstWalletId,
+            long value,
+            String requestId) {
+        try {
+            TransferRequest unsigned = TransferRequest.newBuilder()
+                    .setSrcUserId(srcUserId)
+                    .setSrcWalletId(srcWalletId)
+                    .setDstWalletId(dstWalletId)
+                    .setValue(value)
+                    .setRequestId(requestId)
+                    .clearSignature()
+                    .build();
+            byte[] sig = CryptoUtils.sign(canonicalSignPayload(unsigned), privateKeyForUser(srcUserId));
+            return unsigned.toBuilder().setSignature(ByteString.copyFrom(sig)).build();
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Failed to sign TransferRequest", e);
+        }
+    }
+
     public void createWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber, String requestId) {
-        CreateWalletRequest request = CreateWalletRequest.newBuilder()
-                .setUserId(userId)
-                .setWalletId(walletId)
-                .setRequestId(requestId)
-                .build();
+        CreateWalletRequest request = signedCreateWalletRequest(userId, walletId, requestId);
         if (isBlocking) {
             withReconnectOnUnavailableVoid(() -> {
                 NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
@@ -137,11 +224,7 @@ public class ClientNodeService {
             long commandNumber,
             String requestId,
             StreamObserver<CreateWalletResponse> observer) {
-        CreateWalletRequest request = CreateWalletRequest.newBuilder()
-                .setUserId(userId)
-                .setWalletId(walletId)
-                .setRequestId(requestId)
-                .build();
+        CreateWalletRequest request = signedCreateWalletRequest(userId, walletId, requestId);
         withReconnectOnUnavailableVoid(() -> {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
             stubWithHeaders.createWallet(request, observer);
@@ -149,11 +232,7 @@ public class ClientNodeService {
     }
 
     public void deleteWallet(String userId, String walletId, int delaySeconds, boolean isBlocking, long commandNumber, String requestId) {
-        DeleteWalletRequest request = DeleteWalletRequest.newBuilder()
-                .setUserId(userId)
-                .setWalletId(walletId)
-                .setRequestId(requestId)
-                .build();
+        DeleteWalletRequest request = signedDeleteWalletRequest(userId, walletId, requestId);
         if (isBlocking) {
             withReconnectOnUnavailableVoid(() -> {
                 NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
@@ -174,11 +253,7 @@ public class ClientNodeService {
             long commandNumber,
             String requestId,
             StreamObserver<DeleteWalletResponse> observer) {
-        DeleteWalletRequest request = DeleteWalletRequest.newBuilder()
-                .setUserId(userId)
-                .setWalletId(walletId)
-                .setRequestId(requestId)
-                .build();
+        DeleteWalletRequest request = signedDeleteWalletRequest(userId, walletId, requestId);
         withReconnectOnUnavailableVoid(() -> {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
             stubWithHeaders.deleteWallet(request, observer);
@@ -194,13 +269,7 @@ public class ClientNodeService {
             boolean isBlocking,
             long commandNumber,
             String requestId) {
-        TransferRequest request = TransferRequest.newBuilder()
-                .setSrcUserId(srcUserId)
-                .setSrcWalletId(srcWalletId)
-                .setDstWalletId(dstWalletId)
-                .setValue(value)
-                .setRequestId(requestId)
-                .build();
+        TransferRequest request = signedTransferRequest(srcUserId, srcWalletId, dstWalletId, value, requestId);
         if (isBlocking) {
             withReconnectOnUnavailableVoid(() -> {
                 NodeServiceGrpc.NodeServiceBlockingStub stubWithHeaders = blockingStubWithDelay(delaySeconds);
@@ -223,13 +292,7 @@ public class ClientNodeService {
             long commandNumber,
             String requestId,
             StreamObserver<TransferResponse> observer) {
-        TransferRequest request = TransferRequest.newBuilder()
-                .setSrcUserId(srcUserId)
-                .setSrcWalletId(srcWalletId)
-                .setDstWalletId(dstWalletId)
-                .setValue(value)
-                .setRequestId(requestId)
-                .build();
+        TransferRequest request = signedTransferRequest(srcUserId, srcWalletId, dstWalletId, value, requestId);
         withReconnectOnUnavailableVoid(() -> {
             NodeServiceGrpc.NodeServiceStub stubWithHeaders = asyncStubWithDelay(delaySeconds);
             stubWithHeaders.transfer(request, observer);
