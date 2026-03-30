@@ -10,6 +10,7 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import pt.tecnico.blockchainist.node.domain.ApplicationPipeline;
 import pt.tecnico.blockchainist.node.domain.NodeState;
+import pt.tecnico.blockchainist.node.crypto.RequestSignatureVerifier;
 import pt.tecnico.blockchainist.contract.*;
 
 
@@ -26,6 +27,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     private final String organization;
     private final NodeSequencerService sequencerService;
     private final ApplicationPipeline applicationPipeline;
+    private final RequestSignatureVerifier signatureVerifier;
 
     public NodeServiceImpl(NodeState nodeState, String organization, NodeSequencerService sequencerService,
                            ApplicationPipeline applicationPipeline) {
@@ -33,6 +35,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
         this.organization = organization;
         this.sequencerService = sequencerService;
         this.applicationPipeline = applicationPipeline;
+        this.signatureVerifier = new RequestSignatureVerifier();
     }
 
     private void applyRequestDelayIfAny() throws InterruptedException {
@@ -46,6 +49,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     public void createWallet(CreateWalletRequest request, StreamObserver<CreateWalletResponse> responseObserver) {
         try {
             applyRequestDelayIfAny();
+            signatureVerifier.verifyOrThrow(request);
             nodeState.isUserFromOrganization(request.getUserId(), organization);
 
             Transaction tx = Transaction.newBuilder()
@@ -71,6 +75,8 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             responseObserver.onError(Status.CANCELLED.withDescription("Request interrupted while waiting delay").asRuntimeException());
+        } catch (SecurityException e) {
+            responseObserver.onError(Status.PERMISSION_DENIED.withDescription(e.getMessage()).asRuntimeException());
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
         } catch (Throwable e) {
@@ -82,6 +88,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     public void deleteWallet(DeleteWalletRequest request, StreamObserver<DeleteWalletResponse> responseObserver) {
         try {
             applyRequestDelayIfAny();
+            signatureVerifier.verifyOrThrow(request);
             nodeState.isUserFromOrganization(request.getUserId(), organization);
 
             Transaction tx = Transaction.newBuilder()
@@ -108,6 +115,8 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             responseObserver.onError(Status.CANCELLED.withDescription("Request interrupted while waiting delay").asRuntimeException());
+        } catch (SecurityException e) {
+            responseObserver.onError(Status.PERMISSION_DENIED.withDescription(e.getMessage()).asRuntimeException());
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
         } catch (Throwable e) {
@@ -119,6 +128,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     public void transfer(TransferRequest request, StreamObserver<TransferResponse> responseObserver) {
         try {
             applyRequestDelayIfAny();
+            signatureVerifier.verifyOrThrow(request);
             nodeState.isUserFromOrganization(request.getSrcUserId(), organization);
 
             Transaction tx = Transaction.newBuilder()
@@ -135,6 +145,8 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             responseObserver.onError(Status.CANCELLED.withDescription("Request interrupted while waiting delay").asRuntimeException());
+        } catch (SecurityException e) {
+            responseObserver.onError(Status.PERMISSION_DENIED.withDescription(e.getMessage()).asRuntimeException());
         } catch (IllegalArgumentException e) {
             responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
         } catch (Throwable e) {
