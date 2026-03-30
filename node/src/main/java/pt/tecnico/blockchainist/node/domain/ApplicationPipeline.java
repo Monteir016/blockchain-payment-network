@@ -2,6 +2,7 @@ package pt.tecnico.blockchainist.node.domain;
 
 import pt.tecnico.blockchainist.contract.Block;
 import pt.tecnico.blockchainist.contract.Transaction;
+import pt.tecnico.blockchainist.node.crypto.BlockSignatureVerifier;
 import pt.tecnico.blockchainist.node.grpc.NodeSequencerService;
 
 import java.util.concurrent.*;
@@ -16,6 +17,7 @@ public class ApplicationPipeline implements Runnable {
 
     private final NodeState nodeState;
     private final NodeSequencerService sequencerService;
+    private final BlockSignatureVerifier blockSignatureVerifier;
     private final AtomicInteger nextBlockIndex = new AtomicInteger(0);
 
     // A future for each pending transaction, so we can complete it when the transaction is applied
@@ -25,9 +27,13 @@ public class ApplicationPipeline implements Runnable {
     private volatile boolean running = true;
     private Thread workerThread;
 
-    public ApplicationPipeline(NodeState nodeState, NodeSequencerService sequencerService) {
+    public ApplicationPipeline(
+            NodeState nodeState,
+            NodeSequencerService sequencerService,
+            BlockSignatureVerifier blockSignatureVerifier) {
         this.nodeState = nodeState;
         this.sequencerService = sequencerService;
+        this.blockSignatureVerifier = blockSignatureVerifier;
     }
 
     // Called by the gRPC handler after broadcasting a transaction
@@ -51,6 +57,7 @@ public class ApplicationPipeline implements Runnable {
             boolean debug = Boolean.getBoolean("debug");
             try {
                 Block block = sequencerService.deliverBlockBlocking(next);
+                blockSignatureVerifier.verifyOrThrow(block);
                 if (debug) {
                     System.err.printf("[DEBUG] [Pipeline] Received block %d with %d txs\n",
                             block.getBlockId(), block.getTransactionsCount());
@@ -67,6 +74,10 @@ public class ApplicationPipeline implements Runnable {
                     }
                 }
                 nextBlockIndex.incrementAndGet();
+            } catch (SecurityException e) {
+                System.err.printf("[Security] Rejected block %d: %s%n", next, e.getMessage());
+                sleepOrStop(POLL_MS * 20);
+                continue;
             } catch (io.grpc.StatusRuntimeException e) {
                 if (debug) System.err.println("[DEBUG] [Pipeline] Sequencer unavailable: " + e.getStatus() + " retrying...");
                 sleepOrStop(POLL_MS * 20);
