@@ -41,4 +41,6 @@ message Transaction {
 message Block {
   int32 block_id = 1;
   repeated Transaction transactions = 2;
+  bytes signature = 3;
+  string signer_id = 4;
 }
