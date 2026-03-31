@@ -84,6 +84,15 @@ public class NodeState {
         }
     }
 
+    public synchronized boolean isWalletInOrganization(String walletId, String org) {
+        String ownerId = walletOwners.get(walletId);
+        if (ownerId == null) {
+            return false;
+        }
+        String ownerOrg = organizationByUser.get(ownerId);
+        return ownerOrg != null && ownerOrg.equals(org);
+    }
+
     public synchronized void createWallet(String userId, String walletId) {
 
         if (walletOwners.containsKey(walletId)) {
