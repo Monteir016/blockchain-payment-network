@@ -8,6 +8,7 @@ import io.grpc.ServerInterceptors;
 import pt.tecnico.blockchainist.contract.Block;
 import pt.tecnico.blockchainist.contract.DeliverBlockResponse;
 import pt.tecnico.blockchainist.contract.Transaction;
+import pt.tecnico.blockchainist.node.crypto.BlockSignatureVerifier;
 import pt.tecnico.blockchainist.node.domain.ApplicationPipeline;
 import pt.tecnico.blockchainist.node.domain.NodeState;
 import pt.tecnico.blockchainist.node.grpc.DelayMetadataServerInterceptor;
@@ -87,11 +88,13 @@ public class NodeMain {
 
         // Create domain state
         NodeState nodeState = new NodeState();
+        BlockSignatureVerifier blockSignatureVerifier = new BlockSignatureVerifier();
 
-        int syncedBlocks = bootstrapSync(nodeState, sequencerService);
+        int syncedBlocks = bootstrapSync(nodeState, sequencerService, blockSignatureVerifier);
 
         // Start the application pipeline from the first block not yet applied.
-        ApplicationPipeline applicationPipeline = new ApplicationPipeline(nodeState, sequencerService);
+        ApplicationPipeline applicationPipeline = new ApplicationPipeline(
+                nodeState, sequencerService, blockSignatureVerifier);
         applicationPipeline.setNextBlockIndex(syncedBlocks);
         applicationPipeline.start();
 
@@ -125,7 +128,10 @@ public class NodeMain {
     private static final long BOOTSTRAP_TIMEOUT_MS = 30_000;
     private static final long BOOTSTRAP_RETRY_MS   = 1_000;
 
-    private static int bootstrapSync(NodeState nodeState, NodeSequencerService sequencerService) {
+    private static int bootstrapSync(
+            NodeState nodeState,
+            NodeSequencerService sequencerService,
+            BlockSignatureVerifier blockSignatureVerifier) {
         boolean debug = Boolean.getBoolean("debug");
         if (debug) System.err.println("[DEBUG] Bootstrap sync: fetching existing blocks from sequencer...");
         int blockIndex = 0;
@@ -156,6 +162,12 @@ public class NodeMain {
             }
 
             Block block = opt.get().getBlock();
+            try {
+                blockSignatureVerifier.verifyOrThrow(block);
+            } catch (SecurityException e) {
+                System.err.printf("[Security] Rejected bootstrap block %d: %s%n", blockIndex, e.getMessage());
+                break;
+            }
             for (Transaction tx : block.getTransactionsList()) {
                 try {
                     nodeState.executeTransaction(tx);

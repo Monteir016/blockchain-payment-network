@@ -11,12 +11,14 @@ message CreateWalletRequest {
   string userId = 1;
   string walletId = 2;
   string requestId = 3;
+  bytes signature = 4;
 }
 
 message DeleteWalletRequest {
   string userId = 1;
   string walletId = 2;
   string requestId = 3;
+  bytes signature = 4;
 }
 
 message TransferRequest {
@@ -25,6 +27,7 @@ message TransferRequest {
   string dst_walletId = 3;
   uint64 value = 4;
   string requestId = 5;
+  bytes signature = 6;
 }
 
 message Transaction {
@@ -38,4 +41,6 @@ message Transaction {
 message Block {
   int32 block_id = 1;
   repeated Transaction transactions = 2;
+  bytes signature = 3;
+  string signer_id = 4;
 }
