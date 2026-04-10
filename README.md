@@ -184,7 +184,7 @@ Test cases cover wallet creation/deletion, fund transfers, insufficient balance 
 ## Project Structure
 
 ```
-A46-BlockchainIST-2026/
+blockchain-payment-network/
 ├── contract/src/main/
 │   ├── proto/              # gRPC service & message definitions
 │   └── java/.../crypto/    # CryptoUtils (sign, verify, key loading)
